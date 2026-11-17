@@ -14,12 +14,14 @@ import md.sime.agenda.data.SavedCredentials
 import md.sime.agenda.data.SimeRepository
 import md.sime.agenda.model.AbsenceFilterMode
 import md.sime.agenda.model.AbsenceSortMode
+import md.sime.agenda.model.AppUpdateInfo
 import md.sime.agenda.model.GradeCalculator
 import md.sime.agenda.model.LessonDetail
 import md.sime.agenda.model.LessonEvent
 import md.sime.agenda.model.PortalSnapshot
 import md.sime.agenda.model.ThemeMode
 import md.sime.agenda.model.UserType
+import md.sime.agenda.notifications.AppUpdateChecker
 import md.sime.agenda.notifications.NotificationHelper
 import md.sime.agenda.notifications.SimeSyncWorker
 import java.time.DayOfWeek
@@ -99,6 +101,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _showDossierSheet = MutableStateFlow(false)
     val showDossierSheet: StateFlow<Boolean> = _showDossierSheet.asStateFlow()
 
+    private val _availableUpdate = MutableStateFlow<AppUpdateInfo?>(null)
+    val availableUpdate: StateFlow<AppUpdateInfo?> = _availableUpdate.asStateFlow()
+
     private val checkedWeekMondays = mutableSetOf<String>()
 
     // Live overall average (updates instantly as marks or simulated marks change)
@@ -115,11 +120,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     init {
+        SimeSyncWorker.schedulePeriodicSync(application)
+        checkForAppUpdate()
         val creds = repo.getSavedCredentials()
         if (creds != null && creds.stayLoggedIn) {
             _isLoggedIn.value = true
-            SimeSyncWorker.schedulePeriodicSync(application)
             refreshInBackground(prefetchCalendar = true)
+        }
+    }
+
+    fun checkForAppUpdate() {
+        viewModelScope.launch {
+            _availableUpdate.value = AppUpdateChecker.checkAndNotifyIfAvailable(getApplication())
         }
     }
 
@@ -156,6 +168,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _selectedTab.value = AppTab.HOME
                 _simulatedMarks.value = emptyMap()
                 _simulatedQualifiers.value = emptyMap()
+                SimeSyncWorker.schedulePeriodicSync(getApplication())
+                checkForAppUpdate()
             }.onFailure { err ->
                 _loginError.value = err.message ?: "Autentificare eșuată."
             }
@@ -173,6 +187,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun refreshInBackground(prefetchCalendar: Boolean) {
         if (_isSyncing.value) return
+        checkForAppUpdate()
         viewModelScope.launch {
             _isSyncing.value = true
             _syncError.value = null

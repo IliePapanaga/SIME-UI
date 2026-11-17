@@ -8,12 +8,14 @@ android {
     compileSdk = 34
     buildToolsVersion = "34.0.0"
 
+    val ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+
     defaultConfig {
         applicationId = "md.sime.agenda"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = if (ciRunNumber != null) 100 + ciRunNumber else 3
+        versionName = if (ciRunNumber != null) "1.2.$ciRunNumber" else "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

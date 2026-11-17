@@ -3,6 +3,7 @@ package md.sime.agenda
 import android.Manifest
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -171,6 +172,7 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
     val absenceFilterMode by viewModel.absenceFilterMode.collectAsStateWithLifecycle()
     val lessonDetailState by viewModel.lessonDetailState.collectAsStateWithLifecycle()
     val showDossierSheet by viewModel.showDossierSheet.collectAsStateWithLifecycle()
+    val availableUpdate by viewModel.availableUpdate.collectAsStateWithLifecycle()
 
     val colors = SimeTheme.colors
 
@@ -277,6 +279,46 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
                             text = "Închide",
                             color = colors.textSecondary,
                             fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                val updateBanner = availableUpdate
+                if (updateBanner != null) {
+                    HairlineDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(colors.surfaceElevated)
+                            .clickable {
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, Uri.parse(updateBanner.downloadUrl))
+                                    )
+                                }
+                            }
+                            .padding(horizontal = 16.dp, vertical = 9.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val verLabel = if (updateBanner.versionName == "nouă") {
+                            "Actualizare nouă disponibilă"
+                        } else {
+                            "Actualizare disponibilă · v${updateBanner.versionName}"
+                        }
+                        Text(
+                            text = verLabel,
+                            color = colors.textPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Instalează ›",
+                            color = colors.gradeLowMid,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -417,6 +459,7 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
         DossierSheet(
             snapshot = snapshot,
             currentThemeMode = themeMode,
+            availableUpdate = availableUpdate,
             onSelectTheme = viewModel::setThemeMode,
             onSwitchStudent = viewModel::switchStudent,
             onTestNotification = {

@@ -34,8 +34,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import md.sime.agenda.model.AppUpdateInfo
 import md.sime.agenda.model.PortalSnapshot
 import md.sime.agenda.model.ThemeMode
+import md.sime.agenda.notifications.AppUpdateChecker
 import md.sime.agenda.ui.components.HairlineDivider
 import md.sime.agenda.ui.components.PillToggle
 import md.sime.agenda.ui.components.SegmentedGlassToggle
@@ -47,6 +49,7 @@ import md.sime.agenda.ui.theme.SimeTheme
 fun DossierSheet(
     snapshot: PortalSnapshot?,
     currentThemeMode: ThemeMode,
+    availableUpdate: AppUpdateInfo? = null,
     onSelectTheme: (ThemeMode) -> Unit,
     onSwitchStudent: (String) -> Unit,
     onTestNotification: () -> Unit,
@@ -143,19 +146,30 @@ fun DossierSheet(
             }
 
             // GitHub release update
+            val updateUrl = availableUpdate?.downloadUrl ?: AppUpdateChecker.APK_LATEST_URL
             OutlinedButton(
                 onClick = {
-                    val uri = Uri.parse("https://github.com/IliePapanaga/SIME-UI/releases/latest/download/Agenda.apk")
                     runCatching {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(updateUrl)))
                     }
                 },
                 shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(0.75.dp, colors.border),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.textPrimary),
+                border = BorderStroke(
+                    0.75.dp,
+                    if (availableUpdate != null) colors.gradeLowMid else colors.border
+                ),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (availableUpdate != null) colors.gradeLowMid else colors.textPrimary
+                ),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Actualizează aplicația (GitHub)")
+                val label = if (availableUpdate != null) {
+                    val ver = if (availableUpdate.versionName == "nouă") "" else " v${availableUpdate.versionName}"
+                    "Instalează actualizarea$ver"
+                } else {
+                    "Verifică / Descarcă actualizare (GitHub)"
+                }
+                Text(label)
             }
 
             // Notifications test

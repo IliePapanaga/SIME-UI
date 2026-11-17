@@ -59,11 +59,20 @@ jobs:
       - name: Stage Agenda.apk
         run: cp app/build/outputs/apk/release/app-release.apk Agenda.apk
 
+      - name: Generate version.json
+        run: |
+          VER_CODE=$((100 + ${{ github.run_number }}))
+          VER_NAME="1.2.${{ github.run_number }}"
+          printf '{\n  "versionCode": %s,\n  "versionName": "%s",\n  "commitSha": "%s",\n  "publishedAt": "%s",\n  "downloadUrl": "https://github.com/IliePapanaga/SIME-UI/releases/latest/download/Agenda.apk"\n}\n' \
+            "$VER_CODE" "$VER_NAME" "${{ github.sha }}" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > version.json
+
       - name: Upload Agenda.apk workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: Agenda-apk
-          path: Agenda.apk
+          path: |
+            Agenda.apk
+            version.json
           retention-days: 30
 
       - name: Publish GitHub Release
@@ -72,6 +81,8 @@ jobs:
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
           name: ${{ startsWith(github.ref, 'refs/tags/') && format('Agenda {0}', github.ref_name) || 'Agenda (Latest Build)' }}
-          files: Agenda.apk
+          files: |
+            Agenda.apk
+            version.json
           generate_release_notes: true
           make_latest: true

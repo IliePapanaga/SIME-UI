@@ -7,32 +7,44 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import md.sime.agenda.MainActivity
 import md.sime.agenda.R
+import md.sime.agenda.model.AppUpdateInfo
 import md.sime.agenda.model.TeacherMessage
 
 object NotificationHelper {
 
     const val CHANNEL_ID = "sime_messages"
+    const val CHANNEL_UPDATES_ID = "sime_updates"
     const val EXTRA_OPEN_TAB = "open_tab"
     const val TAB_MESEJE = "mesaje"
 
     fun ensureChannel(context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val existing = manager.getNotificationChannel(CHANNEL_ID)
-        if (existing == null) {
+        if (manager.getNotificationChannel(CHANNEL_ID) == null) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Mesaje profesori",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Notificări când primești un mesaj nou în Agenda SIME"
+                description = "Notificări când primești un mesaj nou în Agenda"
             }
             manager.createNotificationChannel(channel)
+        }
+        if (manager.getNotificationChannel(CHANNEL_UPDATES_ID) == null) {
+            val updatesChannel = NotificationChannel(
+                CHANNEL_UPDATES_ID,
+                "Actualizări aplicație",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notificări când o versiune nouă Agenda este disponibilă pe GitHub"
+            }
+            manager.createNotificationChannel(updatesChannel)
         }
     }
 
@@ -82,6 +94,35 @@ object NotificationHelper {
 
         runCatching {
             NotificationManagerCompat.from(context).notify(notificationId, notification)
+        }
+    }
+
+    fun showAppUpdateNotification(context: Context, update: AppUpdateInfo) {
+        if (!hasNotificationPermission(context)) return
+        ensureChannel(context)
+
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            9002,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val versionSuffix = if (update.versionName == "nouă") "versiune nouă" else "v${update.versionName}"
+        val notification = NotificationCompat.Builder(context, CHANNEL_UPDATES_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("Actualizare disponibilă · Agenda ($versionSuffix)")
+            .setContentText("Apasă pentru a descărca și instala cea mai nouă versiune de pe GitHub.")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        runCatching {
+            NotificationManagerCompat.from(context).notify(9002, notification)
         }
     }
 

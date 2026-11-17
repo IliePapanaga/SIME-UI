@@ -26,6 +26,9 @@ class SimeSyncWorker(
                 notificationId = 2000 + (msg.id.hashCode() and 0x7FFF) + index
             )
         }
+        runCatching {
+            AppUpdateChecker.checkAndNotifyIfAvailable(applicationContext)
+        }
         return Result.success()
     }
 

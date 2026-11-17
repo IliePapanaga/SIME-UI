@@ -191,3 +191,9 @@ data class PortalSnapshot(
     val messages: List<TeacherMessage> = emptyList(),
     val teachers: List<SubjectTeacher> = emptyList()
 )
+
+data class AppUpdateInfo(
+    val versionCode: Int,
+    val versionName: String,
+    val downloadUrl: String
+)
