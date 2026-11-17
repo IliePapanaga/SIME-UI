@@ -1,12 +1,12 @@
 package md.sime.agenda.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import md.sime.agenda.model.AbsenceFilterMode
@@ -39,7 +38,9 @@ import md.sime.agenda.model.PortalSnapshot
 import md.sime.agenda.model.SubjectAbsenceSummary
 import md.sime.agenda.ui.components.HairlineDivider
 import md.sime.agenda.ui.components.PillToggle
+import md.sime.agenda.ui.components.SegmentedGlassToggle
 import md.sime.agenda.ui.components.SimeCard
+import md.sime.agenda.ui.components.VerticalHairlineDivider
 import md.sime.agenda.ui.theme.SimeTheme
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -85,38 +86,52 @@ fun AbsencesScreen(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Summary counters
+        // Unified 4-Column Executive Liquid Glass Strip
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AbsenceStatCard("Total", total.toString(), colors.textPrimary, Modifier.weight(1f))
-                AbsenceStatCard("Motivate", motivated.toString(), colors.absenceMotivated, Modifier.weight(1f))
-                AbsenceStatCard("Nemotivate", unmotivated.toString(), colors.absenceUnmotivated, Modifier.weight(1f))
-                AbsenceStatCard("Prezență", "${snapshot.presencePercent}%", colors.gradeHigh, Modifier.weight(1f))
+            SimeCard(contentPadding = PaddingValues(0.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min)
+                ) {
+                    AbsenceMetricCell(
+                        label = "TOTAL",
+                        value = total.toString(),
+                        valueColor = colors.textPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    VerticalHairlineDivider()
+                    AbsenceMetricCell(
+                        label = "MOTIVATE",
+                        value = motivated.toString(),
+                        valueColor = colors.textPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    VerticalHairlineDivider()
+                    AbsenceMetricCell(
+                        label = "NEMOTIVATE",
+                        value = unmotivated.toString(),
+                        valueColor = if (unmotivated > 0) colors.absenceUnmotivated else colors.textPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    VerticalHairlineDivider()
+                    AbsenceMetricCell(
+                        label = "PREZENȚĂ",
+                        value = "${snapshot.presencePercent}%",
+                        valueColor = colors.textPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
 
         // View switcher: By Days vs By Subjects
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                PillToggle(
-                    label = "Pe zile",
-                    selected = !viewBySubject,
-                    onClick = { viewBySubject = false },
-                    modifier = Modifier.weight(1f)
-                )
-                PillToggle(
-                    label = "Pe discipline",
-                    selected = viewBySubject,
-                    onClick = { viewBySubject = true },
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            SegmentedGlassToggle(
+                options = listOf("Pe zile", "Pe discipline"),
+                selectedIndex = if (viewBySubject) 1 else 0,
+                onSelect = { viewBySubject = it == 1 }
+            )
         }
 
         if (!viewBySubject) {
@@ -196,28 +211,32 @@ fun AbsencesScreen(
 }
 
 @Composable
-private fun AbsenceStatCard(
+private fun AbsenceMetricCell(
     label: String,
     value: String,
     valueColor: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier
 ) {
     val colors = SimeTheme.colors
-    SimeCard(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)
+    Column(
+        modifier = modifier.padding(horizontal = 10.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.Start
     ) {
         Text(
             text = label,
             color = colors.textMuted,
-            fontSize = 11.sp
+            fontSize = 9.sp,
+            letterSpacing = 1.0.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
-        Spacer(modifier = Modifier.height(3.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value,
             color = valueColor,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Light
         )
     }
 }
@@ -244,6 +263,11 @@ private fun DayAbsenceCard(
         group.dateDisplay
     }
 
+    val summaryParts = buildList {
+        if (group.unmotivatedCount > 0) add("${group.unmotivatedCount} nemot.")
+        if (group.motivatedCount > 0) add("${group.motivatedCount} mot.")
+    }.joinToString(" · ")
+
     SimeCard(contentPadding = PaddingValues(0.dp)) {
         Row(
             modifier = Modifier
@@ -251,7 +275,7 @@ private fun DayAbsenceCard(
                 .clickable(enabled = dateIso != null) {
                     if (dateIso != null) onJumpToDate(dateIso, null)
                 }
-                .padding(horizontal = 14.dp, vertical = 11.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -259,16 +283,17 @@ private fun DayAbsenceCard(
                 text = headerLabel,
                 color = colors.textPrimary,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
             )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (group.unmotivatedCount > 0) {
-                    BadgeCount("${group.unmotivatedCount} nemot.", colors.absenceUnmotivated)
-                }
-                if (group.motivatedCount > 0) {
-                    BadgeCount("${group.motivatedCount} mot.", colors.absenceMotivated)
-                }
+            if (summaryParts.isNotEmpty()) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = summaryParts,
+                    color = if (group.unmotivatedCount > 0) colors.absenceUnmotivated else colors.textSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
 
@@ -288,7 +313,7 @@ private fun DayAbsenceCard(
                     text = "Ora ${abs.periodNumber}",
                     color = colors.textMuted,
                     fontSize = 12.sp,
-                    modifier = Modifier.width(46.dp)
+                    modifier = Modifier.width(48.dp)
                 )
                 Text(
                     text = abs.subject,
@@ -298,7 +323,7 @@ private fun DayAbsenceCard(
                 )
                 Text(
                     text = if (abs.isMotivated) "Motivat" else "Nemotivat",
-                    color = if (abs.isMotivated) colors.absenceMotivated else colors.absenceUnmotivated,
+                    color = if (abs.isMotivated) colors.textSecondary else colors.absenceUnmotivated,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -307,23 +332,6 @@ private fun DayAbsenceCard(
                 HairlineDivider()
             }
         }
-    }
-}
-
-@Composable
-private fun BadgeCount(text: String, color: androidx.compose.ui.graphics.Color) {
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = color.copy(alpha = 0.14f),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.4f))
-    ) {
-        Text(
-            text = text,
-            color = color,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-        )
     }
 }
 
@@ -351,14 +359,14 @@ private fun SubjectAbsenceCard(item: SubjectAbsenceSummary) {
                 text = "$tot total",
                 color = colors.textPrimary,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.SemiBold
             )
         }
         Spacer(modifier = Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 text = "Motivate: $mot",
-                color = colors.absenceMotivated,
+                color = colors.textSecondary,
                 fontSize = 12.sp
             )
             Text(

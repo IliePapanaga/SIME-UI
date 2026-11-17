@@ -37,10 +37,11 @@ import md.sime.agenda.model.DatedGrade
 import md.sime.agenda.model.GradeCalculator
 import md.sime.agenda.model.PortalSnapshot
 import md.sime.agenda.model.SubjectGrades
-import md.sime.agenda.ui.components.PillToggle
+import md.sime.agenda.ui.components.HairlineDivider
+import md.sime.agenda.ui.components.SegmentedGlassToggle
 import md.sime.agenda.ui.components.SimeCard
+import md.sime.agenda.ui.components.liquidGlass
 import md.sime.agenda.ui.theme.SimeTheme
-import md.sime.agenda.ui.theme.gradeColor
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -83,66 +84,54 @@ fun GradesScreen(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Semester Switcher + Live Overall Average Summary
+        // Semester Switcher + Portfolio Overall Average Summary
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    PillToggle(
-                        label = "Semestrul I",
-                        selected = selectedSemester == 1,
-                        onClick = { onSelectSemester(1) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    PillToggle(
-                        label = "Semestrul II",
-                        selected = selectedSemester == 2,
-                        onClick = { onSelectSemester(2) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SegmentedGlassToggle(
+                    options = listOf("Semestrul I", "Semestrul II"),
+                    selectedIndex = if (selectedSemester == 1) 0 else 1,
+                    onSelect = { onSelectSemester(it + 1) }
+                )
 
                 SimeCard(
-                    borderColor = if (hasAnySimulated) colors.accent else colors.border,
-                    contentPadding = PaddingValues(14.dp)
+                    isHighlighted = hasAnySimulated,
+                    contentPadding = PaddingValues(16.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (hasAnySimulated) "Media generală (simulare activă)" else "Media generală (live)",
-                                color = colors.textSecondary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
+                                text = if (hasAnySimulated) "MEDIA GENERALĂ · SIMULARE" else "MEDIA GENERALĂ · LIVE",
+                                color = colors.textMuted,
+                                fontSize = 10.sp,
+                                letterSpacing = 1.3.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             val gradedCount = subjects.count { it.liveAverage != null }
                             val totalGrades = subjects.sumOf { it.numericGrades.size }
                             Text(
-                                text = "$totalGrades note • $gradedCount discipline cu medie",
-                                color = colors.textMuted,
+                                text = "$totalGrades evaluări  ·  $gradedCount discipline încheiate",
+                                color = colors.textSecondary,
                                 fontSize = 12.sp
                             )
                         }
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                text = GradeCalculator.formatAverage(liveOverallAverage),
-                                color = gradeColor(liveOverallAverage?.toInt(), colors),
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Text(
+                            text = GradeCalculator.formatAverage(liveOverallAverage),
+                            color = if (hasAnySimulated) colors.gradeLowMid else colors.textPrimary,
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Light
+                        )
                     }
 
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HairlineDivider()
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Row(
@@ -158,7 +147,10 @@ fun GradesScreen(
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             if (hasAnySimulated) {
                                 Text(
                                     text = "Resetează",
@@ -171,23 +163,21 @@ fun GradesScreen(
                                         .padding(horizontal = 6.dp, vertical = 4.dp)
                                 )
                             }
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (isSimulatorMode) colors.accent.copy(alpha = 0.16f) else colors.surfaceElevated,
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (isSimulatorMode) colors.accent else colors.border
-                                ),
+                            Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .liquidGlass(
+                                        shape = RoundedCornerShape(7.dp),
+                                        backgroundColor = colors.surfaceElevated,
+                                        isHighlighted = isSimulatorMode
+                                    )
                                     .clickable { isSimulatorMode = !isSimulatorMode }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
                             ) {
                                 Text(
                                     text = if (isSimulatorMode) "Închide simulator" else "Simulare medie",
-                                    color = if (isSimulatorMode) colors.accent else colors.textSecondary,
+                                    color = if (isSimulatorMode) colors.gradeLowMid else colors.textPrimary,
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
@@ -242,7 +232,8 @@ private fun SubjectGradesCard(
     val colors = SimeTheme.colors
 
     SimeCard(
-        borderColor = if (hasSimulated) colors.accent.copy(alpha = 0.7f) else colors.border,
+        isHighlighted = hasSimulated,
+        borderColor = if (hasSimulated) colors.gradeLowMid.copy(alpha = 0.65f) else colors.border,
         contentPadding = PaddingValues(14.dp)
     ) {
         // Header row: Subject + live average
@@ -263,69 +254,65 @@ private fun SubjectGradesCard(
                     val meta = buildList {
                         if (!subject.tezaRaw.isNullOrBlank()) add("Teză: ${subject.tezaRaw}")
                         if (!subject.officialAverage.isNullOrBlank()) add("Medie oficială: ${subject.officialAverage}")
-                    }.joinToString(" • ")
+                    }.joinToString("  ·  ")
                     Text(
                         text = meta,
                         color = colors.textMuted,
-                        fontSize = 12.sp
+                        fontSize = 11.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Text(
                 text = GradeCalculator.formatAverage(subject.liveAverage),
-                color = gradeColor(subject.liveAverage?.toInt(), colors),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                color = if (hasSimulated) colors.gradeLowMid else colors.textPrimary,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.SemiBold
             )
         }
 
-        // Grade Chips with dates
+        // Precision Monochrome Glass Keycaps
         if (subject.datedGrades.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            HairlineDivider()
             Spacer(modifier = Modifier.height(10.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 subject.datedGrades.forEach { dg ->
-                    val col = if (dg.isSimulated) colors.accent else gradeColor(dg.numericValue, colors)
                     val isClickable = dg.isSimulated || !dg.dateIso.isNullOrBlank()
+                    val keycapBorder = if (dg.isSimulated) colors.gradeLowMid else colors.border
+                    val valueColor = if (dg.isSimulated) colors.gradeLowMid else colors.textPrimary
+                    val dateLabel = when {
+                        dg.isSimulated -> "Sim."
+                        !dg.dateDisplay.isNullOrBlank() -> GradeCalculator.formatDisplayToShort(dg.dateDisplay)
+                        else -> null
+                    }
 
                     Column(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (dg.isSimulated) colors.accent.copy(alpha = 0.14f)
-                                else col.copy(alpha = 0.12f)
-                            )
-                            .border(
-                                1.dp,
-                                if (dg.isSimulated) colors.accent else col.copy(alpha = 0.4f),
-                                RoundedCornerShape(8.dp)
-                            )
+                            .background(colors.surfaceElevated, RoundedCornerShape(8.dp))
+                            .border(0.75.dp, keycapBorder, RoundedCornerShape(8.dp))
                             .let {
                                 if (isClickable) it.clickable { onGradeClick(dg) } else it
                             }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .padding(horizontal = 11.dp, vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             text = dg.rawText,
-                            color = col,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
+                            color = valueColor,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
-                        val dateLabel = when {
-                            dg.isSimulated -> "Sim."
-                            !dg.dateDisplay.isNullOrBlank() -> GradeCalculator.formatDisplayToShort(dg.dateDisplay)
-                            else -> null
-                        }
                         if (!dateLabel.isNullOrBlank()) {
                             Text(
                                 text = dateLabel,
-                                color = if (dg.isSimulated) colors.accent else colors.textSecondary,
+                                color = if (dg.isSimulated) colors.gradeLowMid else colors.textMuted,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -342,14 +329,14 @@ private fun SubjectGradesCard(
             )
         }
 
-        // Simple Live Grade Simulator Row
+        // Live Grade Simulator Row
         if (isSimExpanded) {
             Spacer(modifier = Modifier.height(10.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(colors.surfaceElevated, RoundedCornerShape(8.dp))
-                    .border(1.dp, colors.border, RoundedCornerShape(8.dp))
+                    .border(0.75.dp, colors.border, RoundedCornerShape(8.dp))
                     .padding(horizontal = 10.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -359,7 +346,7 @@ private fun SubjectGradesCard(
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = colors.background,
-                            border = BorderStroke(1.dp, colors.border),
+                            border = BorderStroke(0.75.dp, colors.border),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .clickable { onAddSimulatedMark(mark) }

@@ -1,11 +1,11 @@
 package md.sime.agenda.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,16 +16,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,9 +35,8 @@ import md.sime.agenda.model.PortalSnapshot
 import md.sime.agenda.ui.components.HairlineDivider
 import md.sime.agenda.ui.components.SectionHeader
 import md.sime.agenda.ui.components.SimeCard
+import md.sime.agenda.ui.components.VerticalHairlineDivider
 import md.sime.agenda.ui.theme.SimeTheme
-import md.sime.agenda.ui.theme.gradeColor
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -78,7 +75,6 @@ fun HomeScreen(
     val todayIso = today.toString()
     val todayLessons = scheduleEvents.filter { it.dateIso == todayIso }
 
-    // Find today's lessons, or the next upcoming school day in scheduleEvents
     val (previewDateIso, previewTitle, previewLessons) = if (todayLessons.isNotEmpty()) {
         Triple(todayIso, "Astăzi la școală", todayLessons)
     } else {
@@ -115,44 +111,46 @@ fun HomeScreen(
             .fillMaxSize()
             .background(colors.background),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        // 1. Key Metrics Strip (Live GPA, Presence, Absences)
+        // 1. Unified Executive Metric Strip
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                MetricBox(
-                    label = "Media generală",
-                    value = GradeCalculator.formatAverage(liveOverallAverage),
-                    valueColor = gradeColor(liveOverallAverage?.toInt(), colors),
-                    modifier = Modifier.weight(1f),
-                    onClick = onOpenGrades
-                )
-                MetricBox(
-                    label = "Prezență",
-                    value = "${snapshot.presencePercent}%",
-                    valueColor = if (snapshot.presencePercent >= 80) colors.gradeHigh else colors.textPrimary,
-                    modifier = Modifier.weight(1f),
-                    onClick = onOpenAbsences
-                )
-                MetricBox(
-                    label = "Absențe",
-                    value = totalAbsences.toString(),
-                    valueColor = if (snapshot.cumulativeAbsences.sem1Unmotivated > 0) colors.absenceUnmotivated else colors.textPrimary,
-                    modifier = Modifier.weight(1f),
-                    onClick = onOpenAbsences
-                )
+            SimeCard(contentPadding = PaddingValues(0.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min)
+                ) {
+                    ExecutiveMetricColumn(
+                        label = "MEDIA",
+                        value = GradeCalculator.formatAverage(liveOverallAverage),
+                        onClick = onOpenGrades,
+                        modifier = Modifier.weight(1f)
+                    )
+                    VerticalHairlineDivider()
+                    ExecutiveMetricColumn(
+                        label = "PREZENȚĂ",
+                        value = "${snapshot.presencePercent}%",
+                        onClick = onOpenAbsences,
+                        modifier = Modifier.weight(1f)
+                    )
+                    VerticalHairlineDivider()
+                    ExecutiveMetricColumn(
+                        label = "ABSENȚE",
+                        value = totalAbsences.toString(),
+                        onClick = onOpenAbsences,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
 
-        // 2. Today / Next School Day Lessons Preview
+        // 2. Today / Next School Day Lessons Ledger
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionHeader(
                     title = previewTitle,
-                    trailing = "Vezi tot orarul",
+                    trailing = "Orar complet",
                     onTrailingClick = { onJumpToScheduleDate(previewDateIso, null) }
                 )
                 if (previewLessons.isEmpty()) {
@@ -170,23 +168,22 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { onOpenLessonDetail(lesson) }
-                                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "${lesson.periodNumber}",
+                                    text = lesson.periodNumber.toString().padStart(2, '0'),
                                     color = colors.textMuted,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.width(20.dp)
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.width(26.dp)
                                 )
-                                Column(modifier = Modifier.width(46.dp)) {
-                                    Text(
-                                        text = lesson.startTime,
-                                        color = colors.textSecondary,
-                                        fontSize = 12.sp
-                                    )
-                                }
+                                Text(
+                                    text = lesson.startTime,
+                                    color = colors.textSecondary,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.width(44.dp)
+                                )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = lesson.subject,
@@ -196,28 +193,36 @@ fun HomeScreen(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                    if (!lesson.room.isNullOrBlank()) {
+                                    val meta = buildList {
+                                        if (!lesson.room.isNullOrBlank()) add("Cab. ${lesson.room}")
+                                        if (lesson.teacher.isNotBlank()) add(lesson.teacher)
+                                    }.joinToString(" · ")
+                                    if (meta.isNotBlank()) {
                                         Text(
-                                            text = "Cab. ${lesson.room}",
+                                            text = meta,
                                             color = colors.textMuted,
-                                            fontSize = 12.sp
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                 }
                                 if (!lesson.badgeText.isNullOrBlank()) {
-                                    val badgeCol = if (lesson.isAbsent) colors.absenceUnmotivated
-                                    else gradeColor(lesson.numericGrade, colors)
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = badgeCol.copy(alpha = 0.14f),
-                                        border = BorderStroke(1.dp, badgeCol.copy(alpha = 0.45f))
-                                    ) {
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    if (lesson.isAbsent) {
+                                        Text(
+                                            text = "ABS",
+                                            color = colors.absenceUnmotivated,
+                                            fontSize = 11.sp,
+                                            letterSpacing = 0.8.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    } else {
                                         Text(
                                             text = lesson.badgeText,
-                                            color = badgeCol,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            color = colors.textPrimary,
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.SemiBold
                                         )
                                     }
                                 }
@@ -254,13 +259,13 @@ fun HomeScreen(
                                     .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.Top
                             ) {
-                                androidx.compose.material3.Icon(
+                                Icon(
                                     imageVector = if (isDone) Icons.Outlined.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
                                     contentDescription = null,
-                                    tint = if (isDone) colors.gradeHigh else colors.textMuted,
+                                    tint = if (isDone) colors.textPrimary else colors.textMuted,
                                     modifier = Modifier
                                         .padding(top = 1.dp)
-                                        .size(20.dp)
+                                        .size(19.dp)
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -273,10 +278,14 @@ fun HomeScreen(
                                             text = hw.subject,
                                             color = if (isDone) colors.textMuted else colors.textPrimary,
                                             fontSize = 14.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None
+                                            fontWeight = FontWeight.Medium,
+                                            textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None,
+                                            modifier = Modifier.weight(1f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         if (hw.date.isNotBlank()) {
+                                            Spacer(modifier = Modifier.width(8.dp))
                                             Text(
                                                 text = GradeCalculator.formatDisplayToShort(hw.date),
                                                 color = colors.textMuted,
@@ -303,7 +312,7 @@ fun HomeScreen(
             }
         }
 
-        // 4. Recent Marks (tapping jumps straight to that day in Orar!)
+        // 4. Recent Marks Ledger
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionHeader(
@@ -322,8 +331,6 @@ fun HomeScreen(
                 } else {
                     SimeCard(contentPadding = PaddingValues(0.dp)) {
                         snapshot.recentEvaluations.forEachIndexed { idx, eval ->
-                            val num = eval.grade.trim().toIntOrNull()
-                            val col = gradeColor(num, colors)
                             val dateIso = GradeCalculator.parseDisplayDateToIso(eval.date)
                             Row(
                                 modifier = Modifier
@@ -333,7 +340,7 @@ fun HomeScreen(
                                             onJumpToScheduleDate(dateIso, eval.subject)
                                         }
                                     }
-                                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
@@ -350,17 +357,19 @@ fun HomeScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = col.copy(alpha = 0.14f),
-                                    border = BorderStroke(1.dp, col.copy(alpha = 0.45f))
-                                ) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = eval.grade,
+                                    color = colors.textPrimary,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                if (dateIso != null) {
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = eval.grade,
-                                        color = col,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 2.dp)
+                                        text = "›",
+                                        color = colors.textMuted,
+                                        fontSize = 15.sp
                                     )
                                 }
                             }
@@ -373,21 +382,23 @@ fun HomeScreen(
             }
         }
 
-        // 5. Lesson Replacements (compact unless active)
+        // 5. Lesson Replacements
         if (snapshot.hasReplacements && snapshot.replacementsText.isNotBlank()) {
             item {
                 SimeCard(borderColor = colors.gradeLowMid.copy(alpha = 0.5f)) {
                     Text(
-                        text = "Lecții înlocuite",
+                        text = "LECȚII ÎNLOCUITE",
                         color = colors.gradeLowMid,
-                        fontSize = 13.sp,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.2.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = snapshot.replacementsText,
                         color = colors.textPrimary,
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp
                     )
                 }
             }
@@ -398,32 +409,34 @@ fun HomeScreen(
 }
 
 @Composable
-private fun MetricBox(
+private fun ExecutiveMetricColumn(
     label: String,
     value: String,
-    valueColor: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = SimeTheme.colors
-    SimeCard(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-        onClick = onClick
+    Column(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.Start
     ) {
         Text(
             text = label,
             color = colors.textMuted,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
+            letterSpacing = 1.2.sp,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(5.dp))
         Text(
             text = value,
-            color = valueColor,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
+            color = colors.textPrimary,
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Light
         )
     }
 }

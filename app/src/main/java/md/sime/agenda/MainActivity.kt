@@ -12,7 +12,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,9 +39,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +61,7 @@ import md.sime.agenda.notifications.NotificationHelper
 import md.sime.agenda.ui.AppTab
 import md.sime.agenda.ui.MainViewModel
 import md.sime.agenda.ui.components.HairlineDivider
+import md.sime.agenda.ui.components.liquidGlass
 import md.sime.agenda.ui.screens.AbsencesScreen
 import md.sime.agenda.ui.screens.DossierSheet
 import md.sime.agenda.ui.screens.GradesScreen
@@ -99,8 +99,12 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            SimeAgendaTheme(themeMode = themeMode) {
-                SimeAppRoot(viewModel = viewModel)
+            CompositionLocalProvider(
+                androidx.lifecycle.compose.LocalLifecycleOwner provides this@MainActivity
+            ) {
+                SimeAgendaTheme(themeMode = themeMode) {
+                    SimeAppRoot(viewModel = viewModel)
+                }
             }
         }
     }
@@ -181,29 +185,29 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
+                        val classSuffix = snapshot?.profile?.className?.takeIf { it.isNotBlank() }
+                        Text(
+                            text = if (classSuffix != null) "AGENDA  ·  $classSuffix" else "AGENDA",
+                            color = colors.textMuted,
+                            fontSize = 10.sp,
+                            letterSpacing = 1.4.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = selectedTab.label,
                             color = colors.textPrimary,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 22.sp,
+                            letterSpacing = (-0.4).sp,
+                            fontWeight = FontWeight.SemiBold
                         )
-                        val sub = snapshot?.profile?.let { p ->
-                            listOf(p.shortName, p.className).filter { it.isNotBlank() }.joinToString(" • ")
-                        }.orEmpty()
-                        if (sub.isNotBlank()) {
-                            Text(
-                                text = sub,
-                                color = colors.textMuted,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
                     }
 
                     Row(
@@ -213,8 +217,8 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
                         if (isSyncing) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = colors.accent
+                                strokeWidth = 1.8.dp,
+                                color = colors.textPrimary
                             )
                         } else {
                             IconButton(
@@ -225,27 +229,27 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
                                     imageVector = Icons.Outlined.Refresh,
                                     contentDescription = "Actualizează",
                                     tint = colors.textSecondary,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(19.dp)
                                 )
                             }
                         }
 
                         val initials = snapshot?.profile?.initials?.ifBlank { "AE" } ?: "AE"
                         val classLabel = snapshot?.profile?.className.orEmpty()
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = colors.surface,
-                            border = BorderStroke(1.dp, colors.border),
+                        Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .liquidGlass(
+                                    shape = RoundedCornerShape(10.dp),
+                                    backgroundColor = colors.surface
+                                )
                                 .clickable { viewModel.openDossierSheet() }
+                                .padding(horizontal = 11.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = if (classLabel.isNotBlank()) "$initials • $classLabel" else initials,
+                                text = if (classLabel.isNotBlank()) "$initials · $classLabel" else initials,
                                 color = colors.textPrimary,
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -283,7 +287,7 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(colors.background)
+                    .background(colors.surface)
                     .navigationBarsPadding()
             ) {
                 HairlineDivider()
@@ -303,10 +307,17 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
                             AppTab.ABSENCES -> Icons.Outlined.EventBusy
                             AppTab.MESSAGES -> Icons.Outlined.MailOutline
                         }
+                        val tabBg = if (selected) {
+                            if (colors.isDark) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f)
+                            else colors.surfaceElevated
+                        } else {
+                            androidx.compose.ui.graphics.Color.Transparent
+                        }
                         Column(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(10.dp))
+                                .background(tabBg, RoundedCornerShape(10.dp))
                                 .clickable { viewModel.selectTab(tab) }
                                 .padding(vertical = 6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -315,13 +326,13 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
                                 imageVector = icon,
                                 contentDescription = tab.label,
                                 tint = if (selected) colors.textPrimary else colors.textMuted,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(19.dp)
                             )
                             Spacer(modifier = Modifier.height(3.dp))
                             Text(
                                 text = tab.label,
                                 color = if (selected) colors.textPrimary else colors.textMuted,
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                 maxLines = 1
                             )

@@ -37,55 +37,55 @@ data class SimePalette(
 
 val AmoledPalette = SimePalette(
     background = Color(0xFF000000),
-    surface = Color(0xFF0B0B0E),
-    surfaceElevated = Color(0xFF141418),
-    border = Color(0xFF202026),
-    textPrimary = Color(0xFFF4F4F6),
-    textSecondary = Color(0xFF9898A3),
-    textMuted = Color(0xFF60606B),
-    accent = Color(0xFF3B82F6),
-    gradeHigh = Color(0xFF10B981),
-    gradeMid = Color(0xFF38BDF8),
-    gradeLowMid = Color(0xFFF59E0B),
-    gradeLow = Color(0xFFEF4444),
-    absenceMotivated = Color(0xFF3B82F6),
-    absenceUnmotivated = Color(0xFFEF4444),
+    surface = Color(0xFF0A0B0E),
+    surfaceElevated = Color(0xFF121318),
+    border = Color(0xFF22242C),
+    textPrimary = Color(0xFFF5F5F7),
+    textSecondary = Color(0xFFA0A3AD),
+    textMuted = Color(0xFF636672),
+    accent = Color(0xFFE4E4E9),
+    gradeHigh = Color(0xFFF5F5F7),
+    gradeMid = Color(0xFFD4D4D8),
+    gradeLowMid = Color(0xFFC8A97E),
+    gradeLow = Color(0xFFD96B6B),
+    absenceMotivated = Color(0xFF9496A1),
+    absenceUnmotivated = Color(0xFFD96B6B),
     isDark = true
 )
 
 val DarkSlatePalette = SimePalette(
-    background = Color(0xFF0F1115),
-    surface = Color(0xFF161920),
-    surfaceElevated = Color(0xFF1E222B),
-    border = Color(0xFF2A2F3B),
-    textPrimary = Color(0xFFF3F4F6),
-    textSecondary = Color(0xFF9CA3AF),
-    textMuted = Color(0xFF6B7280),
-    accent = Color(0xFF3B82F6),
-    gradeHigh = Color(0xFF10B981),
-    gradeMid = Color(0xFF38BDF8),
-    gradeLowMid = Color(0xFFF59E0B),
-    gradeLow = Color(0xFFEF4444),
-    absenceMotivated = Color(0xFF3B82F6),
-    absenceUnmotivated = Color(0xFFEF4444),
+    background = Color(0xFF090A0D),
+    surface = Color(0xFF111318),
+    surfaceElevated = Color(0xFF181B22),
+    border = Color(0xFF262A34),
+    textPrimary = Color(0xFFF5F5F7),
+    textSecondary = Color(0xFFA0A3AD),
+    textMuted = Color(0xFF686C78),
+    accent = Color(0xFFE4E4E9),
+    gradeHigh = Color(0xFFF5F5F7),
+    gradeMid = Color(0xFFD4D4D8),
+    gradeLowMid = Color(0xFFC8A97E),
+    gradeLow = Color(0xFFD96B6B),
+    absenceMotivated = Color(0xFF9496A1),
+    absenceUnmotivated = Color(0xFFD96B6B),
     isDark = true
 )
 
 val LightPalette = SimePalette(
-    background = Color(0xFFF6F7F9),
+    background = Color(0xFFF3F4F6),
     surface = Color(0xFFFFFFFF),
-    surfaceElevated = Color(0xFFF0F2F5),
-    border = Color(0xFFE2E5EC),
-    textPrimary = Color(0xFF111827),
-    textSecondary = Color(0xFF4B5563),
-    textMuted = Color(0xFF9CA3AF),
-    accent = Color(0xFF2563EB),
-    gradeHigh = Color(0xFF059669),
-    gradeMid = Color(0xFF0284C7),
-    gradeLowMid = Color(0xFFD97706),
-    gradeLow = Color(0xFFDC2626),
-    absenceMotivated = Color(0xFF2563EB),
-    absenceUnmotivated = Color(0xFFDC2626),
+    surfaceElevated = Color(0xFFEAECEF),
+    border = Color(0xFFDCDFE6),
+    textPrimary = Color(0xFF0F1115),
+    textSecondary = Color(0xFF525662),
+    textMuted = Color(0xFF888C99),
+    accent = Color(0xFF18191E),
+    gradeHigh = Color(0xFF0F1115),
+    gradeMid = Color(0xFF3F434E),
+    gradeLowMid = Color(0xFF9A6E32),
+    gradeLow = Color(0xFFB93838),
+    absenceMotivated = Color(0xFF525662),
+    absenceUnmotivated = Color(0xFFB93838),
     isDark = false
 )
 
@@ -102,31 +102,36 @@ private val SimeTypography = Typography(
         fontWeight = FontWeight.SemiBold,
         fontSize = 20.sp,
         lineHeight = 26.sp,
-        letterSpacing = (-0.2).sp
+        letterSpacing = (-0.2).sp,
+        fontFeatureSettings = "tnum"
     ),
     titleMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
-        lineHeight = 22.sp
+        lineHeight = 22.sp,
+        fontFeatureSettings = "tnum"
     ),
     titleSmall = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
-        lineHeight = 20.sp
+        lineHeight = 20.sp,
+        fontFeatureSettings = "tnum"
     ),
     bodyMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 20.sp
+        lineHeight = 20.sp,
+        fontFeatureSettings = "tnum"
     ),
     bodySmall = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
-        lineHeight = 16.sp
+        lineHeight = 16.sp,
+        fontFeatureSettings = "tnum"
     ),
     labelMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -158,7 +163,7 @@ fun SimeAgendaTheme(
     val m3Scheme = if (palette.isDark) {
         darkColorScheme(
             primary = palette.accent,
-            onPrimary = Color.White,
+            onPrimary = Color(0xFF090A0D),
             background = palette.background,
             onBackground = palette.textPrimary,
             surface = palette.surface,

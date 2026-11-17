@@ -43,7 +43,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -53,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import md.sime.agenda.data.SavedCredentials
 import md.sime.agenda.model.UserType
-import md.sime.agenda.ui.components.PillToggle
+import md.sime.agenda.ui.components.SegmentedGlassToggle
 import md.sime.agenda.ui.components.SimeCard
 import md.sime.agenda.ui.theme.SimeTheme
 
@@ -86,10 +85,19 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
+                text = "SIME  ·  MOLDOVA",
+                color = colors.textMuted,
+                fontSize = 10.sp,
+                letterSpacing = 1.6.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
                 text = "Agenda",
                 color = colors.textPrimary,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 30.sp,
+                letterSpacing = (-0.5).sp,
+                fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
@@ -103,23 +111,24 @@ fun LoginScreen(
             // 1-Tap Login card when credentials are saved on device
             if (savedCredentials != null) {
                 SimeCard(
-                    borderColor = colors.accent.copy(alpha = 0.5f),
+                    isHighlighted = true,
                     contentPadding = PaddingValues(16.dp)
                 ) {
                     Text(
-                        text = "Cont salvat pe dispozitiv",
-                        color = colors.textSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                        text = "CONT SALVAT LOCAL",
+                        color = colors.textMuted,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.2.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "${savedCredentials.username} • ${savedCredentials.userType.labelRo}",
+                        text = "${savedCredentials.username}  ·  ${savedCredentials.userType.labelRo}",
                         color = colors.textPrimary,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Button(
                         onClick = onOneTapLogin,
                         enabled = !isLoading,
@@ -128,15 +137,15 @@ fun LoginScreen(
                             .height(46.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = colors.accent,
-                            contentColor = Color.White
+                            containerColor = colors.textPrimary,
+                            contentColor = colors.background
                         )
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp,
-                                color = Color.White
+                                color = colors.background
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Se conectează...")
@@ -159,42 +168,31 @@ fun LoginScreen(
 
             SimeCard(contentPadding = PaddingValues(16.dp)) {
                 Text(
-                    text = if (savedCredentials != null) "Sau alt cont" else "Autentificare",
-                    color = colors.textPrimary,
-                    fontSize = 15.sp,
+                    text = if (savedCredentials != null) "SAU ALT CONT" else "AUTENTIFICARE",
+                    color = colors.textMuted,
+                    fontSize = 10.sp,
+                    letterSpacing = 1.3.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // User Type Segmented Switcher
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    PillToggle(
-                        label = "Elev",
-                        selected = userType == UserType.ELEV,
-                        onClick = { userType = UserType.ELEV },
-                        modifier = Modifier.weight(1f)
-                    )
-                    PillToggle(
-                        label = "Părinte",
-                        selected = userType == UserType.PARINTE,
-                        onClick = { userType = UserType.PARINTE },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                SegmentedGlassToggle(
+                    options = listOf("Elev", "Părinte"),
+                    selectedIndex = if (userType == UserType.ELEV) 0 else 1,
+                    onSelect = { userType = if (it == 0) UserType.ELEV else UserType.PARINTE }
+                )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
                 val fieldColors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = colors.accent,
+                    focusedBorderColor = colors.textPrimary,
                     unfocusedBorderColor = colors.border,
                     focusedTextColor = colors.textPrimary,
                     unfocusedTextColor = colors.textPrimary,
-                    focusedLabelColor = colors.accent,
-                    unfocusedLabelColor = colors.textSecondary,
-                    cursorColor = colors.accent,
+                    focusedLabelColor = colors.textSecondary,
+                    unfocusedLabelColor = colors.textMuted,
+                    cursorColor = colors.textPrimary,
                     focusedContainerColor = colors.background,
                     unfocusedContainerColor = colors.background
                 )
@@ -244,7 +242,7 @@ fun LoginScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -268,8 +266,8 @@ fun LoginScreen(
                         checked = stayLoggedIn,
                         onCheckedChange = { stayLoggedIn = it },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = colors.accent,
+                            checkedThumbColor = colors.background,
+                            checkedTrackColor = colors.textPrimary,
                             uncheckedThumbColor = colors.textSecondary,
                             uncheckedTrackColor = colors.surfaceElevated
                         )
@@ -296,15 +294,15 @@ fun LoginScreen(
                             .height(48.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = colors.accent,
-                            contentColor = Color.White
+                            containerColor = colors.textPrimary,
+                            contentColor = colors.background
                         )
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp,
-                                color = Color.White
+                                color = colors.background
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Se autentifică...")
@@ -324,7 +322,7 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .height(46.dp),
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, colors.border),
+                        border = BorderStroke(0.75.dp, colors.border),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = colors.textPrimary
                         )

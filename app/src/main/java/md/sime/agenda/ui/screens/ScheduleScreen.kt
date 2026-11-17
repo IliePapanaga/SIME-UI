@@ -4,11 +4,11 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,7 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,10 +48,12 @@ import androidx.compose.ui.unit.sp
 import md.sime.agenda.model.GradeCalculator
 import md.sime.agenda.model.LessonEvent
 import md.sime.agenda.ui.LessonDetailSheetState
+import md.sime.agenda.ui.components.HairlineDivider
 import md.sime.agenda.ui.components.SimeCard
 import md.sime.agenda.ui.components.StatusDot
+import md.sime.agenda.ui.components.VerticalHairlineDivider
+import md.sime.agenda.ui.components.liquidGlass
 import md.sime.agenda.ui.theme.SimeTheme
-import md.sime.agenda.ui.theme.gradeColor
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -119,20 +121,20 @@ fun ScheduleScreen(
                 )
                 val todayIso = LocalDate.now().toString()
                 if (selectedDateIso != todayIso) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = colors.surfaceElevated,
-                        border = BorderStroke(1.dp, colors.border),
+                    Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .liquidGlass(
+                                shape = RoundedCornerShape(7.dp),
+                                backgroundColor = colors.surfaceElevated
+                            )
                             .clickable { onSelectDate(todayIso) }
+                            .padding(horizontal = 9.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = "Azi",
-                            color = colors.accent,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            color = colors.textPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
@@ -166,17 +168,21 @@ fun ScheduleScreen(
                 val shortDay = day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale("ro", "MD"))
                     .replace(".", "")
                     .take(3)
-                    .replaceFirstChar { it.uppercaseChar() }
+                    .uppercase()
+
+                val cellBg = if (isSelected) {
+                    if (colors.isDark) Color.White.copy(alpha = 0.13f) else colors.surface
+                } else {
+                    colors.surface
+                }
 
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isSelected) colors.textPrimary else colors.surface)
-                        .border(
-                            1.dp,
-                            if (isSelected) colors.textPrimary else colors.border,
-                            RoundedCornerShape(10.dp)
+                        .liquidGlass(
+                            shape = RoundedCornerShape(10.dp),
+                            backgroundColor = cellBg,
+                            isHighlighted = isSelected
                         )
                         .clickable { onSelectDate(dayIso) }
                         .padding(vertical = 8.dp),
@@ -184,24 +190,25 @@ fun ScheduleScreen(
                 ) {
                     Text(
                         text = shortDay,
-                        color = if (isSelected) colors.background.copy(alpha = 0.75f) else colors.textMuted,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
+                        color = if (isSelected) colors.textPrimary else colors.textMuted,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.8.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = day.dayOfMonth.toString(),
-                        color = if (isSelected) colors.background else colors.textPrimary,
+                        color = if (isSelected) colors.textPrimary else colors.textSecondary,
                         fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
-                        modifier = Modifier.height(6.dp),
+                        modifier = Modifier.height(5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (hasMark) StatusDot(colors.gradeHigh)
+                        if (hasMark) StatusDot(colors.textSecondary)
                         if (hasAbsence) StatusDot(colors.absenceUnmotivated)
                     }
                 }
@@ -278,35 +285,37 @@ private fun LessonTimelineCard(
     onClick: () -> Unit
 ) {
     val colors = SimeTheme.colors
-    val border = if (isHighlighted) colors.accent else colors.border
-    val bg = if (isHighlighted) colors.accent.copy(alpha = 0.08f) else colors.surface
 
     SimeCard(
-        borderColor = border,
-        backgroundColor = bg,
+        isHighlighted = isHighlighted,
+        backgroundColor = if (isHighlighted && colors.isDark) Color(0xFF13151B) else colors.surface,
         contentPadding = PaddingValues(14.dp),
         onClick = onClick
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
             verticalAlignment = Alignment.Top
         ) {
             // Left time & period column
             Column(
-                modifier = Modifier.width(54.dp),
+                modifier = Modifier.width(52.dp),
                 horizontalAlignment = Alignment.Start
             ) {
                 Text(
-                    text = "Ora ${lesson.periodNumber}",
-                    color = colors.textPrimary,
-                    fontSize = 12.sp,
+                    text = "ORA ${lesson.periodNumber}",
+                    color = colors.textMuted,
+                    fontSize = 10.sp,
+                    letterSpacing = 1.0.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = lesson.startTime,
-                    color = colors.textSecondary,
-                    fontSize = 12.sp
+                    color = colors.textPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
                 )
                 Text(
                     text = lesson.endTime,
@@ -315,7 +324,9 @@ private fun LessonTimelineCard(
                 )
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
+            VerticalHairlineDivider()
+            Spacer(modifier = Modifier.width(12.dp))
 
             // Right details column
             Column(modifier = Modifier.weight(1f)) {
@@ -331,74 +342,70 @@ private fun LessonTimelineCard(
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    if (!lesson.room.isNullOrBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = colors.surfaceElevated,
-                            border = BorderStroke(1.dp, colors.border)
-                        ) {
+                    if (!lesson.badgeText.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.width(10.dp))
+                        if (lesson.isAbsent) {
                             Text(
-                                text = lesson.room,
-                                color = colors.textSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                text = "ABSENȚĂ",
+                                color = colors.absenceUnmotivated,
+                                fontSize = 10.sp,
+                                letterSpacing = 0.8.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
+                        } else {
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "NOTA",
+                                    color = colors.textMuted,
+                                    fontSize = 9.sp,
+                                    letterSpacing = 1.0.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = lesson.badgeText,
+                                    color = colors.textPrimary,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                val meta = buildList {
+                    if (lesson.teacher.isNotBlank()) add(lesson.teacher)
+                    if (!lesson.room.isNullOrBlank()) add("Cab. ${lesson.room}")
+                }.joinToString("  ·  ")
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                if (meta.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
-                        text = lesson.teacher,
+                        text = meta,
                         color = colors.textSecondary,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
+                        overflow = TextOverflow.Ellipsis
                     )
-                    if (!lesson.badgeText.isNullOrBlank()) {
-                        val col = if (lesson.isAbsent) colors.absenceUnmotivated
-                        else gradeColor(lesson.numericGrade, colors)
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = col.copy(alpha = 0.14f),
-                            border = BorderStroke(1.dp, col.copy(alpha = 0.5f))
-                        ) {
-                            Text(
-                                text = if (lesson.isAbsent) "Absență" else "Nota ${lesson.badgeText}",
-                                color = col,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
                 }
 
                 if (!lesson.homeworkSnippet.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HairlineDivider()
                     Spacer(modifier = Modifier.height(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(colors.surfaceElevated, RoundedCornerShape(8.dp))
-                            .border(1.dp, colors.border, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = lesson.homeworkSnippet,
-                            color = colors.textSecondary,
-                            fontSize = 12.sp,
-                            lineHeight = 17.sp
-                        )
-                    }
+                    Text(
+                        text = "TEMĂ",
+                        color = colors.textMuted,
+                        fontSize = 9.sp,
+                        letterSpacing = 1.1.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = lesson.homeworkSnippet,
+                        color = colors.textSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp
+                    )
                 }
             }
         }
@@ -421,10 +428,10 @@ private fun LessonDetailSheetContent(state: LessonDetailSheetState) {
             text = state.lesson.subject,
             color = colors.textPrimary,
             fontSize = 19.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "Ora ${state.lesson.periodNumber} • ${state.lesson.startTime}–${state.lesson.endTime} • ${state.lesson.dateDisplay}",
+            text = "Ora ${state.lesson.periodNumber}  ·  ${state.lesson.startTime}–${state.lesson.endTime}  ·  ${state.lesson.dateDisplay}",
             color = colors.textSecondary,
             fontSize = 13.sp
         )
@@ -439,9 +446,9 @@ private fun LessonDetailSheetContent(state: LessonDetailSheetState) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = colors.accent
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 1.8.dp,
+                        color = colors.textPrimary
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text("Se încarcă detaliile lecției...", color = colors.textSecondary, fontSize = 13.sp)
@@ -459,20 +466,18 @@ private fun LessonDetailSheetContent(state: LessonDetailSheetState) {
                 if (detail.isSummative || detail.isTeza || !detail.evaluation.isNullOrBlank()) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (!detail.evaluation.isNullOrBlank()) {
-                            val num = detail.evaluation.toIntOrNull()
-                            val col = if (detail.evaluation.equals("a", true)) colors.absenceUnmotivated
-                            else gradeColor(num, colors)
+                            val isAbs = detail.evaluation.equals("a", true)
                             Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = col.copy(alpha = 0.14f),
-                                border = BorderStroke(1.dp, col.copy(alpha = 0.5f))
+                                shape = RoundedCornerShape(7.dp),
+                                color = colors.surfaceElevated,
+                                border = BorderStroke(0.75.dp, colors.border)
                             ) {
                                 Text(
                                     text = "Evaluare: ${detail.evaluation}",
-                                    color = col,
+                                    color = if (isAbs) colors.absenceUnmotivated else colors.textPrimary,
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                 )
                             }
                         }
@@ -486,18 +491,18 @@ private fun LessonDetailSheetContent(state: LessonDetailSheetState) {
                 }
 
                 DetailBlock(
-                    label = "Subiectul lecției",
+                    label = "SUBIECTUL LECȚIEI",
                     text = detail.topic.ifBlank { "Necompletat de profesor." }
                 )
 
                 DetailBlock(
-                    label = "Activități de învățare (Temă)",
+                    label = "ACTIVITĂȚI DE ÎNVĂȚARE (TEMĂ)",
                     text = detail.homework.ifBlank { "Fără temă pentru acasă." }
                 )
 
                 if (detail.teacherMessage.isNotBlank()) {
                     DetailBlock(
-                        label = "Mesajul profesorului",
+                        label = "MESAJUL PROFESORULUI",
                         text = detail.teacherMessage
                     )
                 }
@@ -509,18 +514,18 @@ private fun LessonDetailSheetContent(state: LessonDetailSheetState) {
                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(detail.meetingLink)))
                             }
                         },
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, colors.accent),
+                        shape = RoundedCornerShape(9.dp),
+                        border = BorderStroke(0.75.dp, colors.border),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = colors.accent
+                            tint = colors.textPrimary
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Deschide lecția online", color = colors.accent)
+                        Text("Deschide lecția online", color = colors.textPrimary)
                     }
                 }
             }
@@ -532,16 +537,16 @@ private fun LessonDetailSheetContent(state: LessonDetailSheetState) {
 private fun DetailTag(text: String) {
     val colors = SimeTheme.colors
     Surface(
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(7.dp),
         color = colors.surfaceElevated,
-        border = BorderStroke(1.dp, colors.border)
+        border = BorderStroke(0.75.dp, colors.border)
     ) {
         Text(
             text = text,
-            color = colors.textPrimary,
+            color = colors.textSecondary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
         )
     }
 }
@@ -551,15 +556,16 @@ private fun DetailBlock(label: String, text: String) {
     val colors = SimeTheme.colors
     SimeCard(
         backgroundColor = colors.surfaceElevated,
-        contentPadding = PaddingValues(12.dp)
+        contentPadding = PaddingValues(13.dp)
     ) {
         Text(
             text = label,
             color = colors.textMuted,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium
+            fontSize = 10.sp,
+            letterSpacing = 1.1.sp,
+            fontWeight = FontWeight.SemiBold
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(5.dp))
         Text(
             text = text,
             color = colors.textPrimary,

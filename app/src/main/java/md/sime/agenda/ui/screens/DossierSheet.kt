@@ -35,6 +35,7 @@ import md.sime.agenda.model.PortalSnapshot
 import md.sime.agenda.model.ThemeMode
 import md.sime.agenda.ui.components.HairlineDivider
 import md.sime.agenda.ui.components.PillToggle
+import md.sime.agenda.ui.components.SegmentedGlassToggle
 import md.sime.agenda.ui.components.SimeCard
 import md.sime.agenda.ui.theme.SimeTheme
 
@@ -124,31 +125,24 @@ fun DossierSheet(
             // Theme Mode Switcher
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Temă vizuală",
-                    color = colors.textPrimary,
-                    fontSize = 14.sp,
+                    text = "TEMĂ VIZUALĂ",
+                    color = colors.textMuted,
+                    fontSize = 10.sp,
+                    letterSpacing = 1.2.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ThemeMode.entries.forEach { mode ->
-                        PillToggle(
-                            label = mode.label,
-                            selected = currentThemeMode == mode,
-                            onClick = { onSelectTheme(mode) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
+                SegmentedGlassToggle(
+                    options = ThemeMode.entries.map { it.label },
+                    selectedIndex = ThemeMode.entries.indexOf(currentThemeMode).coerceAtLeast(0),
+                    onSelect = { onSelectTheme(ThemeMode.entries[it]) }
+                )
             }
 
             // Notifications test
             OutlinedButton(
                 onClick = onTestNotification,
                 shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, colors.border),
+                border = BorderStroke(0.75.dp, colors.border),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.textPrimary),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -159,9 +153,10 @@ fun DossierSheet(
             if (snapshot != null && snapshot.teachers.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Discipline și profesori",
-                        color = colors.textPrimary,
-                        fontSize = 14.sp,
+                        text = "DISCIPLINE ȘI PROFESORI",
+                        color = colors.textMuted,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.2.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     OutlinedTextField(
@@ -171,7 +166,7 @@ fun DossierSheet(
                         singleLine = true,
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = colors.accent,
+                            focusedBorderColor = colors.textPrimary,
                             unfocusedBorderColor = colors.border,
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary,

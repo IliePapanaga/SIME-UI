@@ -4,20 +4,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import md.sime.agenda.model.GradeCalculator
 import md.sime.agenda.model.PortalSnapshot
+import md.sime.agenda.ui.components.HairlineDivider
 import md.sime.agenda.ui.components.SimeCard
 import md.sime.agenda.ui.theme.SimeTheme
 
@@ -60,25 +56,27 @@ fun MessagesScreen(
     ) {
         if (!hasNotificationPermission) {
             item {
-                SimeCard(borderColor = colors.accent.copy(alpha = 0.6f)) {
+                SimeCard {
                     Text(
-                        text = "Notificări dezactivate",
-                        color = colors.textPrimary,
-                        fontSize = 14.sp,
+                        text = "NOTIFICĂRI DEZACTIVATE",
+                        color = colors.textMuted,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.2.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "Activează notificările pentru a primi alerte instant când un profesor îți scrie.",
                         color = colors.textSecondary,
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     OutlinedButton(
                         onClick = onRequestNotificationPermission,
                         shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, colors.accent),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.accent)
+                        border = BorderStroke(0.75.dp, colors.border),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.textPrimary)
                     ) {
                         Text("Activează notificările")
                     }
@@ -104,45 +102,32 @@ fun MessagesScreen(
                 } else {
                     null
                 }
+                val kicker = buildList {
+                    if (msg.subject.isNotBlank()) add(msg.subject.uppercase())
+                    if (msg.date.isNotBlank()) add(msg.date.uppercase())
+                }.joinToString("  ·  ")
+
                 SimeCard(
                     contentPadding = PaddingValues(14.dp),
                     onClick = openAction
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    if (kicker.isNotBlank()) {
                         Text(
-                            text = msg.professor,
-                            color = colors.textPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = msg.date,
+                            text = kicker,
                             color = colors.textMuted,
-                            fontSize = 11.sp
+                            fontSize = 10.sp,
+                            letterSpacing = 1.1.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
-                    if (msg.subject.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = colors.surfaceElevated,
-                            border = BorderStroke(1.dp, colors.border)
-                        ) {
-                            Text(
-                                text = msg.subject,
-                                color = colors.accent,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = msg.professor,
+                        color = colors.textPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = msg.text,
                         color = colors.textSecondary,
@@ -150,10 +135,12 @@ fun MessagesScreen(
                         lineHeight = 20.sp
                     )
                     if (!dateIso.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        HairlineDivider()
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Vezi lecția din ${GradeCalculator.formatIsoToShortDisplay(dateIso)} în Orar →",
-                            color = colors.accent,
+                            text = "Deschide lecția (${GradeCalculator.formatIsoToShortDisplay(dateIso)})  ›",
+                            color = colors.textPrimary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
