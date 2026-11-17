@@ -4,11 +4,63 @@ import java.text.Normalizer
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.roundToInt
 
 object GradeCalculator {
 
     private val displayDateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.ROOT)
     private val isoDateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+
+    private val qualifierSubjectKeywords = listOf(
+        "educatie fizica",
+        "dezvoltare personala",
+        "educatie pentru societate",
+        "educatie muzicala",
+        "educatie plastica",
+        "educatie tehnologica"
+    )
+
+    fun isQualifierSubject(subject: SubjectGrades): Boolean {
+        if (subject.qualifiers.isNotEmpty() && subject.numericGrades.isEmpty()) return true
+        if (subject.numericGrades.isNotEmpty()) return false
+        val norm = normalizeSubject(subject.subject)
+        return qualifierSubjectKeywords.any { norm.contains(it) }
+    }
+
+    fun canonicalQualifier(raw: String): String? {
+        val norm = normalizeSubject(raw)
+        return when {
+            norm == "fb" || norm.contains("foarte bine") -> "Foarte bine"
+            norm == "b" || norm == "bine" -> "Bine"
+            norm == "s" || norm == "suficient" -> "Suficient"
+            norm == "i" || norm.contains("insuficient") || norm.contains("nesuficient") -> "Insuficient"
+            else -> null
+        }
+    }
+
+    fun calculateQualifierSummary(
+        qualifiers: List<String>,
+        officialAverage: String? = null
+    ): String? {
+        val points = qualifiers.mapNotNull { q ->
+            when (canonicalQualifier(q)) {
+                "Foarte bine" -> 4
+                "Bine" -> 3
+                "Suficient" -> 2
+                "Insuficient" -> 1
+                else -> null
+            }
+        }
+        if (points.isEmpty()) {
+            return officialAverage?.takeIf { it.isNotBlank() }
+        }
+        return when (points.average().roundToInt().coerceIn(1, 4)) {
+            4 -> "Foarte bine"
+            3 -> "Bine"
+            2 -> "Suficient"
+            else -> "Insuficient"
+        }
+    }
 
     fun normalizeSubject(subject: String): String {
         val unified = subject
@@ -109,17 +161,18 @@ object GradeCalculator {
     }
 
     /**
-     * Produces a live view of SubjectGrades incorporating simulated marks.
+     * Produces a live view of SubjectGrades incorporating simulated marks and qualifiers.
      */
     fun applySimulatedMarks(
         subject: SubjectGrades,
-        simulatedMarks: List<Int>
+        simulatedMarks: List<Int>,
+        simulatedQualifiers: List<String> = emptyList()
     ): SubjectGrades {
-        if (simulatedMarks.isEmpty()) {
+        if (simulatedMarks.isEmpty() && simulatedQualifiers.isEmpty()) {
             val live = calculateSubjectAverage(subject.numericGrades, subject.teza)
             return subject.copy(liveAverage = live)
         }
-        val extraDated = simulatedMarks.mapIndexed { idx, value ->
+        val extraNumeric = simulatedMarks.mapIndexed { idx, value ->
             DatedGrade(
                 id = "sim_${subject.subject}_$idx",
                 numericValue = value,
@@ -129,17 +182,30 @@ object GradeCalculator {
                 isSimulated = true
             )
         }
+        val extraQualifiers = simulatedQualifiers.mapIndexed { idx, qualifier ->
+            DatedGrade(
+                id = "simq_${subject.subject}_$idx",
+                numericValue = null,
+                rawText = qualifier,
+                dateDisplay = "Simulat",
+                dateIso = null,
+                isSimulated = true
+            )
+        }
         val combinedNums = subject.numericGrades + simulatedMarks
+        val combinedQuals = subject.qualifiers + simulatedQualifiers
         return subject.copy(
-            datedGrades = subject.datedGrades + extraDated,
+            datedGrades = subject.datedGrades + extraNumeric + extraQualifiers,
             numericGrades = combinedNums,
+            qualifiers = combinedQuals,
             liveAverage = calculateSubjectAverage(combinedNums, subject.teza)
         )
     }
 
     private data class DatedOccurrence(
         val subjectKey: String,
-        val grade: Int,
+        val grade: Int?,
+        val qualifier: String?,
         val dateDisplay: String,
         val dateIso: String,
         val periodNumber: Int?,
@@ -148,8 +214,8 @@ object GradeCalculator {
     )
 
     /**
-     * Cross-references Reușita marks with dated grade badges from Agenda schedule events
-     * and Dashboard's RecentEvaluations so tapping a mark jumps directly to that lesson day.
+     * Cross-references Reușita marks & qualifiers with dated badges from Agenda schedule events
+     * and Dashboard's RecentEvaluations so tapping a mark or qualifier jumps to that lesson day.
      */
     fun enrichGradesWithDates(
         subjects: List<SubjectGrades>,
@@ -158,20 +224,24 @@ object GradeCalculator {
     ): List<SubjectGrades> {
         val poolBySubject = mutableMapOf<String, MutableList<DatedOccurrence>>()
 
-        // 1. Add dated lesson events from Agenda FullCalendar
+        // 1. Add dated lesson events from Agenda FullCalendar (numeric grades & qualifiers)
         val seenKeys = mutableSetOf<String>()
         scheduleEvents
-            .filter { it.numericGrade != null && it.dateIso.isNotBlank() }
+            .filter { it.dateIso.isNotBlank() && !it.isAbsent && (it.numericGrade != null || !it.badgeText.isNullOrBlank()) }
             .sortedWith(compareBy<LessonEvent> { it.dateIso }.thenBy { it.periodNumber })
             .forEach { ev ->
                 val subjKey = normalizeSubject(ev.subject)
-                val grade = ev.numericGrade ?: return@forEach
-                val dedupKey = "$subjKey|${ev.dateDisplay}|$grade|${ev.periodNumber}"
+                val grade = ev.numericGrade
+                val qualifier = if (grade == null) ev.badgeText?.let { canonicalQualifier(it) } else null
+                if (grade == null && qualifier == null) return@forEach
+                val tokenKey = grade?.toString() ?: qualifier.orEmpty()
+                val dedupKey = "$subjKey|${ev.dateDisplay}|$tokenKey|${ev.periodNumber}"
                 if (seenKeys.add(dedupKey)) {
                     poolBySubject.getOrPut(subjKey) { mutableListOf() }.add(
                         DatedOccurrence(
                             subjectKey = subjKey,
                             grade = grade,
+                            qualifier = qualifier,
                             dateDisplay = ev.dateDisplay,
                             dateIso = ev.dateIso,
                             periodNumber = ev.periodNumber,
@@ -184,18 +254,23 @@ object GradeCalculator {
 
         // 2. Add any RecentEvaluations not already represented in scheduleEvents
         recentEvaluations.forEach { eval ->
-            val grade = eval.grade.trim().toIntOrNull() ?: return@forEach
+            val rawGrade = eval.grade.trim()
+            val grade = rawGrade.toIntOrNull()
+            val qualifier = if (grade == null) canonicalQualifier(rawGrade) else null
+            if (grade == null && qualifier == null) return@forEach
             val subjKey = normalizeSubject(eval.subject)
             val dateIso = parseDisplayDateToIso(eval.date) ?: return@forEach
             val existingList = poolBySubject.getOrPut(subjKey) { mutableListOf() }
-            val alreadyHasSameDayAndGrade = existingList.any {
-                it.dateDisplay == eval.date.trim() && it.grade == grade
+            val alreadyExists = existingList.any {
+                it.dateDisplay == eval.date.trim() &&
+                    ((grade != null && it.grade == grade) || (qualifier != null && it.qualifier == qualifier))
             }
-            if (!alreadyHasSameDayAndGrade) {
+            if (!alreadyExists) {
                 existingList.add(
                     DatedOccurrence(
                         subjectKey = subjKey,
                         grade = grade,
+                        qualifier = qualifier,
                         dateDisplay = eval.date.trim(),
                         dateIso = dateIso,
                         periodNumber = null,
@@ -215,25 +290,27 @@ object GradeCalculator {
             val subjKey = normalizeSubject(subject.subject)
             val available = poolBySubject[subjKey]?.toMutableList() ?: mutableListOf()
 
-            // Reușita lists grades oldest -> newest; match newest -> oldest so recent/known
-            // marks align accurately even if earlier semester months haven't been loaded yet.
+            // Match newest -> oldest so known marks/qualifiers align accurately
             val matched = MutableList<DatedGrade?>(subject.datedGrades.size) { null }
             for (i in subject.datedGrades.indices.reversed()) {
                 val g = subject.datedGrades[i]
                 val num = g.numericValue
-                if (num != null) {
-                    val matchIdx = available.indexOfLast { it.grade == num }
-                    if (matchIdx >= 0) {
-                        val occ = available.removeAt(matchIdx)
-                        matched[i] = g.copy(
-                            dateDisplay = occ.dateDisplay,
-                            dateIso = occ.dateIso,
-                            periodNumber = occ.periodNumber,
-                            lessonId = occ.lessonId,
-                            detailUrl = occ.detailUrl
-                        )
-                        continue
-                    }
+                val qual = canonicalQualifier(g.rawText)
+                val matchIdx = when {
+                    num != null -> available.indexOfLast { it.grade == num }
+                    qual != null -> available.indexOfLast { it.qualifier == qual }
+                    else -> -1
+                }
+                if (matchIdx >= 0) {
+                    val occ = available.removeAt(matchIdx)
+                    matched[i] = g.copy(
+                        dateDisplay = occ.dateDisplay,
+                        dateIso = occ.dateIso,
+                        periodNumber = occ.periodNumber,
+                        lessonId = occ.lessonId,
+                        detailUrl = occ.detailUrl
+                    )
+                    continue
                 }
                 matched[i] = g
             }

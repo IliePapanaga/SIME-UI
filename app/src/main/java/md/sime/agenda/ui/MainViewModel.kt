@@ -83,6 +83,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _simulatedMarks = MutableStateFlow<Map<String, List<Int>>>(emptyMap())
     val simulatedMarks: StateFlow<Map<String, List<Int>>> = _simulatedMarks.asStateFlow()
 
+    // Subject name -> list of simulated qualifiers (e.g., ["Foarte bine", "Bine"])
+    private val _simulatedQualifiers = MutableStateFlow<Map<String, List<String>>>(emptyMap())
+    val simulatedQualifiers: StateFlow<Map<String, List<String>>> = _simulatedQualifiers.asStateFlow()
+
     private val _absenceSortMode = MutableStateFlow(AbsenceSortMode.NEWEST)
     val absenceSortMode: StateFlow<AbsenceSortMode> = _absenceSortMode.asStateFlow()
 
@@ -151,6 +155,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _isLoggedIn.value = true
                 _selectedTab.value = AppTab.HOME
                 _simulatedMarks.value = emptyMap()
+                _simulatedQualifiers.value = emptyMap()
             }.onFailure { err ->
                 _loginError.value = err.message ?: "Autentificare eșuată."
             }
@@ -246,31 +251,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addSimulatedMark(subject: String, mark: Int) {
-        val current = _simulatedMarks.value.toMutableMap()
-        val list = current[subject].orEmpty() + mark
-        current[subject] = list
-        _simulatedMarks.value = current
+        _simulatedMarks.value = appendToSimulatedMap(_simulatedMarks.value, subject, mark)
     }
 
     fun removeLastSimulatedMark(subject: String) {
-        val current = _simulatedMarks.value.toMutableMap()
-        val list = current[subject].orEmpty()
-        if (list.size <= 1) {
-            current.remove(subject)
-        } else {
-            current[subject] = list.dropLast(1)
-        }
-        _simulatedMarks.value = current
+        _simulatedMarks.value = popFromSimulatedMap(_simulatedMarks.value, subject)
+    }
+
+    fun addSimulatedQualifier(subject: String, qualifier: String) {
+        _simulatedQualifiers.value = appendToSimulatedMap(_simulatedQualifiers.value, subject, qualifier)
+    }
+
+    fun removeLastSimulatedQualifier(subject: String) {
+        _simulatedQualifiers.value = popFromSimulatedMap(_simulatedQualifiers.value, subject)
     }
 
     fun resetSimulatedMarks(subject: String? = null) {
         if (subject == null) {
             _simulatedMarks.value = emptyMap()
+            _simulatedQualifiers.value = emptyMap()
         } else {
-            val current = _simulatedMarks.value.toMutableMap()
-            current.remove(subject)
-            _simulatedMarks.value = current
+            _simulatedMarks.value = _simulatedMarks.value.toMutableMap().apply { remove(subject) }
+            _simulatedQualifiers.value = _simulatedQualifiers.value.toMutableMap().apply { remove(subject) }
         }
+    }
+
+    private fun <T> appendToSimulatedMap(
+        map: Map<String, List<T>>,
+        subject: String,
+        value: T
+    ): Map<String, List<T>> = map.toMutableMap().apply {
+        this[subject] = this[subject].orEmpty() + value
+    }
+
+    private fun <T> popFromSimulatedMap(
+        map: Map<String, List<T>>,
+        subject: String
+    ): Map<String, List<T>> = map.toMutableMap().apply {
+        val list = this[subject].orEmpty()
+        if (list.size <= 1) remove(subject) else this[subject] = list.dropLast(1)
     }
 
     fun setAbsenceSortMode(mode: AbsenceSortMode) {
@@ -327,6 +346,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repo.switchStudent(switchUrl)
             _isSyncing.value = false
             _simulatedMarks.value = emptyMap()
+            _simulatedQualifiers.value = emptyMap()
         }
     }
 
@@ -341,6 +361,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _savedCredentials.value = repo.getSavedCredentials()
             _isLoggedIn.value = false
             _simulatedMarks.value = emptyMap()
+            _simulatedQualifiers.value = emptyMap()
             _loginError.value = null
         }
     }

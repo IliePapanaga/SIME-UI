@@ -8,7 +8,9 @@ import md.sime.agenda.model.GradeCalculator
 import md.sime.agenda.model.LessonEvent
 import md.sime.agenda.model.SubjectGrades
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GradeCalculatorTest {
@@ -129,5 +131,48 @@ class GradeCalculatorTest {
         assertEquals("2026-10-06", GradeCalculator.parseRomanianDateToIso("6 octombrie 2026"))
         assertEquals("2026-09-28", GradeCalculator.parseRomanianDateToIso("28 septembrie 2026"))
         assertEquals("2026-11-17", GradeCalculator.parseRomanianDateToIso("17.11.2026"))
+    }
+
+    @Test
+    fun qualifierSubjects_simulateAndComputeSummaryQualifiers() {
+        val pe = SubjectGrades(
+            semester = 1,
+            subject = "Educație fizică",
+            rawEntries = listOf("Foarte bine"),
+            datedGrades = listOf(DatedGrade("q1", null, "Foarte bine")),
+            numericGrades = emptyList(),
+            qualifiers = listOf("Foarte bine"),
+            teza = null,
+            tezaRaw = null,
+            officialAverage = null,
+            liveAverage = null
+        )
+
+        assertTrue(GradeCalculator.isQualifierSubject(pe))
+        assertEquals("Foarte bine", GradeCalculator.calculateQualifierSummary(pe.qualifiers))
+
+        val simulated = GradeCalculator.applySimulatedMarks(
+            subject = pe,
+            simulatedMarks = emptyList(),
+            simulatedQualifiers = listOf("Bine", "Bine")
+        )
+        assertEquals(listOf("Foarte bine", "Bine", "Bine"), simulated.qualifiers)
+        assertEquals(3, simulated.datedGrades.size)
+        assertTrue(simulated.datedGrades.last().isSimulated)
+        assertEquals("Bine", GradeCalculator.calculateQualifierSummary(simulated.qualifiers))
+
+        val math = SubjectGrades(
+            semester = 1,
+            subject = "Matematică",
+            rawEntries = listOf("10"),
+            datedGrades = listOf(DatedGrade("m1", 10, "10")),
+            numericGrades = listOf(10),
+            qualifiers = emptyList(),
+            teza = null,
+            tezaRaw = null,
+            officialAverage = null,
+            liveAverage = 10.0
+        )
+        assertFalse(GradeCalculator.isQualifierSubject(math))
     }
 }

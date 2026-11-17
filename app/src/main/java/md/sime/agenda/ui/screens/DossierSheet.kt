@@ -1,5 +1,7 @@
 package md.sime.agenda.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +55,7 @@ fun DossierSheet(
     onDismiss: () -> Unit
 ) {
     val colors = SimeTheme.colors
+    val context = LocalContext.current
     var teacherQuery by remember { mutableStateOf("") }
 
     ModalBottomSheet(
@@ -136,6 +140,22 @@ fun DossierSheet(
                     selectedIndex = ThemeMode.entries.indexOf(currentThemeMode).coerceAtLeast(0),
                     onSelect = { onSelectTheme(ThemeMode.entries[it]) }
                 )
+            }
+
+            // GitHub release update
+            OutlinedButton(
+                onClick = {
+                    val uri = Uri.parse("https://github.com/IliePapanaga/SIME-UI/releases/latest/download/Agenda.apk")
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    }
+                },
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(0.75.dp, colors.border),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.textPrimary),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Actualizează aplicația (GitHub)")
             }
 
             // Notifications test

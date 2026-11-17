@@ -6,13 +6,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import md.sime.agenda.model.AbsenceFilterMode
+import md.sime.agenda.model.AbsenceSortMode
 import md.sime.agenda.model.CumulativeAbsences
+import md.sime.agenda.model.DailyAbsence
 import md.sime.agenda.model.DatedGrade
 import md.sime.agenda.model.HomeworkItem
 import md.sime.agenda.model.LessonEvent
 import md.sime.agenda.model.PortalSnapshot
 import md.sime.agenda.model.RecentEvaluation
 import md.sime.agenda.model.StudentProfile
+import md.sime.agenda.model.SubjectAbsenceSummary
 import md.sime.agenda.model.SubjectGrades
 import md.sime.agenda.model.ThemeMode
 import md.sime.agenda.ui.theme.SimeAgendaTheme
@@ -130,12 +134,37 @@ private fun sampleSnapshot(): PortalSnapshot = PortalSnapshot(
             tezaRaw = null,
             officialAverage = null,
             liveAverage = 10.0
+        ),
+        SubjectGrades(
+            semester = 1,
+            subject = "Educație fizică",
+            rawEntries = listOf("Foarte bine"),
+            datedGrades = listOf(
+                DatedGrade("q1", null, "Foarte bine")
+            ),
+            numericGrades = emptyList(),
+            qualifiers = listOf("Foarte bine"),
+            teza = null,
+            tezaRaw = null,
+            officialAverage = null,
+            liveAverage = null
         )
     ),
+    dailyAbsences = listOf(
+        DailyAbsence("17.11.2026", 20774L, "4", "Matematică", false, 74, "Noiembrie 2026"),
+        DailyAbsence("17.11.2026", 20774L, "5", "Limba engleză", false, 75, "Noiembrie 2026"),
+        DailyAbsence("13.11.2026", 20770L, "1", "Limba engleză", false, 70, "Noiembrie 2026"),
+        DailyAbsence("13.11.2026", 20770L, "2", "Geografie", true, 71, "Noiembrie 2026")
+    ),
+    subjectAbsences = listOf(
+        SubjectAbsenceSummary("Limba engleză", 8, 2, 10, 0, 0, 0),
+        SubjectAbsenceSummary("Matematică", 4, 1, 5, 0, 0, 0),
+        SubjectAbsenceSummary("Geografie", 6, 0, 6, 0, 0, 0)
+    ),
     cumulativeAbsences = CumulativeAbsences(
-        sem1Motivated = 4,
-        sem1Unmotivated = 1,
-        sem1Total = 5
+        sem1Motivated = 70,
+        sem1Unmotivated = 6,
+        sem1Total = 76
     )
 )
 
@@ -168,11 +197,29 @@ fun GradesPreview() {
                 snapshot = sampleSnapshot(),
                 selectedSemester = 1,
                 simulatedMarks = emptyMap(),
+                simulatedQualifiers = mapOf("Educație fizică" to listOf("Bine")),
                 liveOverallAverage = 9.84,
                 onSelectSemester = {},
                 onAddSimulatedMark = { _, _ -> },
                 onRemoveLastSimulatedMark = {},
                 onResetSimulatedMarks = {},
+                onJumpToScheduleDate = { _, _ -> }
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 412, heightDp = 892)
+@Composable
+fun AbsencesPreview() {
+    SimeAgendaTheme(ThemeMode.AMOLED) {
+        Box(modifier = Modifier.fillMaxSize().background(SimeTheme.colors.background)) {
+            AbsencesScreen(
+                snapshot = sampleSnapshot(),
+                sortMode = AbsenceSortMode.NEWEST,
+                filterMode = AbsenceFilterMode.ALL,
+                onSelectSortMode = {},
+                onSelectFilterMode = {},
                 onJumpToScheduleDate = { _, _ -> }
             )
         }

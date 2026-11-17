@@ -49,10 +49,13 @@ fun GradesScreen(
     snapshot: PortalSnapshot?,
     selectedSemester: Int,
     simulatedMarks: Map<String, List<Int>>,
+    simulatedQualifiers: Map<String, List<String>> = emptyMap(),
     liveOverallAverage: Double?,
     onSelectSemester: (Int) -> Unit,
     onAddSimulatedMark: (subject: String, mark: Int) -> Unit,
     onRemoveLastSimulatedMark: (subject: String) -> Unit,
+    onAddSimulatedQualifier: (subject: String, qualifier: String) -> Unit = { _, _ -> },
+    onRemoveLastSimulatedQualifier: (subject: String) -> Unit = {},
     onResetSimulatedMarks: (subject: String?) -> Unit,
     onJumpToScheduleDate: (dateIso: String, subject: String) -> Unit
 ) {
@@ -73,9 +76,14 @@ fun GradesScreen(
 
     val rawSubjects = if (selectedSemester == 1) snapshot.sem1Grades else snapshot.sem2Grades
     val subjects = rawSubjects.map { sub ->
-        GradeCalculator.applySimulatedMarks(sub, simulatedMarks[sub.subject].orEmpty())
+        GradeCalculator.applySimulatedMarks(
+            subject = sub,
+            simulatedMarks = simulatedMarks[sub.subject].orEmpty(),
+            simulatedQualifiers = simulatedQualifiers[sub.subject].orEmpty()
+        )
     }
-    val hasAnySimulated = simulatedMarks.values.any { it.isNotEmpty() }
+    val hasAnySimulated = simulatedMarks.values.any { it.isNotEmpty() } ||
+        simulatedQualifiers.values.any { it.isNotEmpty() }
 
     LazyColumn(
         modifier = Modifier
@@ -114,7 +122,7 @@ fun GradesScreen(
                             val gradedCount = subjects.count { it.liveAverage != null }
                             val totalGrades = subjects.sumOf { it.numericGrades.size }
                             Text(
-                                text = "$totalGrades evaluări  ·  $gradedCount discipline încheiate",
+                                text = "$totalGrades evaluări  ·  $gradedCount discipline cu medie",
                                 color = colors.textSecondary,
                                 fontSize = 12.sp
                             )
@@ -140,7 +148,7 @@ fun GradesScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (isSimulatorMode) "Simulator: apasă +10..+5 pe o disciplină"
+                            text = if (isSimulatorMode) "Simulator: adaugă note sau calificative"
                             else "Apasă pe o notă pentru a deschide lecția",
                             color = colors.textMuted,
                             fontSize = 12.sp,
@@ -198,15 +206,22 @@ fun GradesScreen(
             }
         } else {
             items(subjects, key = { "${it.semester}_${it.subject}" }) { subject ->
+                val hasSimSubject = simulatedMarks[subject.subject].orEmpty().isNotEmpty() ||
+                    simulatedQualifiers[subject.subject].orEmpty().isNotEmpty()
                 SubjectGradesCard(
                     subject = subject,
                     isSimExpanded = isSimulatorMode,
-                    hasSimulated = simulatedMarks[subject.subject].orEmpty().isNotEmpty(),
+                    hasSimulated = hasSimSubject,
                     onAddSimulatedMark = { mark -> onAddSimulatedMark(subject.subject, mark) },
+                    onAddSimulatedQualifier = { qual -> onAddSimulatedQualifier(subject.subject, qual) },
                     onResetSubject = { onResetSimulatedMarks(subject.subject) },
                     onGradeClick = { dg ->
                         if (dg.isSimulated) {
-                            onRemoveLastSimulatedMark(subject.subject)
+                            if (dg.numericValue == null) {
+                                onRemoveLastSimulatedQualifier(subject.subject)
+                            } else {
+                                onRemoveLastSimulatedMark(subject.subject)
+                            }
                         } else if (!dg.dateIso.isNullOrBlank()) {
                             onJumpToScheduleDate(dg.dateIso, subject.subject)
                         }
@@ -226,17 +241,24 @@ private fun SubjectGradesCard(
     isSimExpanded: Boolean,
     hasSimulated: Boolean,
     onAddSimulatedMark: (Int) -> Unit,
+    onAddSimulatedQualifier: (String) -> Unit,
     onResetSubject: () -> Unit,
     onGradeClick: (DatedGrade) -> Unit
 ) {
     val colors = SimeTheme.colors
+    val isQualifier = GradeCalculator.isQualifierSubject(subject)
+    val qualifierSummary = if (isQualifier) {
+        GradeCalculator.calculateQualifierSummary(subject.qualifiers, subject.officialAverage)
+    } else {
+        null
+    }
 
     SimeCard(
         isHighlighted = hasSimulated,
         borderColor = if (hasSimulated) colors.gradeLowMid.copy(alpha = 0.65f) else colors.border,
         contentPadding = PaddingValues(14.dp)
     ) {
-        // Header row: Subject + live average
+        // Header row: Subject + live average / qualifier summary
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -265,12 +287,21 @@ private fun SubjectGradesCard(
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            Text(
-                text = GradeCalculator.formatAverage(subject.liveAverage),
-                color = if (hasSimulated) colors.gradeLowMid else colors.textPrimary,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            if (isQualifier) {
+                Text(
+                    text = qualifierSummary ?: "—",
+                    color = if (hasSimulated) colors.gradeLowMid else colors.textPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            } else {
+                Text(
+                    text = GradeCalculator.formatAverage(subject.liveAverage),
+                    color = if (hasSimulated) colors.gradeLowMid else colors.textPrimary,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
 
         // Precision Monochrome Glass Keycaps
@@ -306,7 +337,7 @@ private fun SubjectGradesCard(
                         Text(
                             text = dg.rawText,
                             color = valueColor,
-                            fontSize = 15.sp,
+                            fontSize = if (dg.rawText.length > 3) 13.sp else 15.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                         if (!dateLabel.isNullOrBlank()) {
@@ -323,13 +354,13 @@ private fun SubjectGradesCard(
         } else {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Nicio notă înregistrată",
+                text = if (isQualifier) "Niciun calificativ înregistrat" else "Nicio notă înregistrată",
                 color = colors.textMuted,
                 fontSize = 12.sp
             )
         }
 
-        // Live Grade Simulator Row
+        // Live Simulator Row (Qualifiers for descriptor subjects, Numeric marks otherwise)
         if (isSimExpanded) {
             Spacer(modifier = Modifier.height(10.dp))
             Row(
@@ -341,27 +372,55 @@ private fun SubjectGradesCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(10, 9, 8, 7, 6, 5).forEach { mark ->
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = colors.background,
-                            border = BorderStroke(0.75.dp, colors.border),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable { onAddSimulatedMark(mark) }
-                        ) {
-                            Text(
-                                text = "+$mark",
-                                color = colors.textPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
-                            )
+                if (isQualifier) {
+                    FlowRow(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("Foarte bine", "Bine", "Suficient").forEach { qualifier ->
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = colors.background,
+                                border = BorderStroke(0.75.dp, colors.border),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable { onAddSimulatedQualifier(qualifier) }
+                            ) {
+                                Text(
+                                    text = "+$qualifier",
+                                    color = colors.textPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(10, 9, 8, 7, 6, 5).forEach { mark ->
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = colors.background,
+                                border = BorderStroke(0.75.dp, colors.border),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable { onAddSimulatedMark(mark) }
+                            ) {
+                                Text(
+                                    text = "+$mark",
+                                    color = colors.textPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
                 }
                 if (hasSimulated) {
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Șterge",
                         color = colors.gradeLow,

@@ -165,6 +165,7 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
     val highlightedSubject by viewModel.highlightedLessonSubject.collectAsStateWithLifecycle()
     val selectedSemester by viewModel.selectedSemester.collectAsStateWithLifecycle()
     val simulatedMarks by viewModel.simulatedMarks.collectAsStateWithLifecycle()
+    val simulatedQualifiers by viewModel.simulatedQualifiers.collectAsStateWithLifecycle()
     val liveOverallAverage by viewModel.liveOverallAverage.collectAsStateWithLifecycle()
     val absenceSortMode by viewModel.absenceSortMode.collectAsStateWithLifecycle()
     val absenceFilterMode by viewModel.absenceFilterMode.collectAsStateWithLifecycle()
@@ -374,10 +375,13 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
                     snapshot = snapshot,
                     selectedSemester = selectedSemester,
                     simulatedMarks = simulatedMarks,
+                    simulatedQualifiers = simulatedQualifiers,
                     liveOverallAverage = liveOverallAverage,
                     onSelectSemester = viewModel::selectSemester,
                     onAddSimulatedMark = viewModel::addSimulatedMark,
                     onRemoveLastSimulatedMark = viewModel::removeLastSimulatedMark,
+                    onAddSimulatedQualifier = viewModel::addSimulatedQualifier,
+                    onRemoveLastSimulatedQualifier = viewModel::removeLastSimulatedQualifier,
                     onResetSimulatedMarks = viewModel::resetSimulatedMarks,
                     onJumpToScheduleDate = { dateIso, subj ->
                         viewModel.jumpToScheduleDate(dateIso, subj, openDetailAutomatically = true)
