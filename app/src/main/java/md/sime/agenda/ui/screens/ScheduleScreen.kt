@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -71,19 +73,23 @@ fun ScheduleScreen(
     onDismissLessonDetail: () -> Unit
 ) {
     val colors = SimeTheme.colors
-    val selectedDate = runCatching { LocalDate.parse(selectedDateIso) }.getOrElse { LocalDate.now() }
+    val today = LocalDate.now()
+    val todayIso = today.toString()
+    val selectedDate = runCatching { LocalDate.parse(selectedDateIso) }.getOrElse { today }
     val monday = selectedDate.with(DayOfWeek.MONDAY)
     val saturday = monday.plusDays(5)
     val hasSaturdayLessons = scheduleEvents.any { it.dateIso == saturday.toString() }
     val weekDays = (0 until if (hasSaturdayLessons) 6 else 5).map { monday.plusDays(it.toLong()) }
 
-    val dayLessons = scheduleEvents.filter { it.dateIso == selectedDateIso }
     val weekRangeText = buildString {
-        val end = monday.plusDays(4)
+        val end = if (hasSaturdayLessons) saturday else monday.plusDays(4)
         append(GradeCalculator.formatIsoToShortDisplay(monday.toString()))
         append(" – ")
         append(GradeCalculator.formatIsoToShortDisplay(end.toString()))
     }
+    val weekStartIso = weekDays.first().toString()
+    val weekEndIso = weekDays.last().toString()
+    val weekHasAnyLessons = scheduleEvents.any { it.dateIso in weekStartIso..weekEndIso }
 
     Column(
         modifier = Modifier
@@ -119,7 +125,6 @@ fun ScheduleScreen(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                val todayIso = LocalDate.now().toString()
                 if (selectedDateIso != todayIso) {
                     Box(
                         modifier = Modifier
@@ -152,7 +157,7 @@ fun ScheduleScreen(
             }
         }
 
-        // Horizontal Day Strip
+        // Horizontal Quick-Jump Day Strip
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -215,10 +220,10 @@ fun ScheduleScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // Lesson Timeline
-        if (dayLessons.isEmpty()) {
+        // Continuous Full-Week Feed centered on active/current day
+        if (!weekHasAnyLessons) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -226,42 +231,65 @@ fun ScheduleScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Nu există lecții înregistrate pentru ${GradeCalculator.formatIsoToShortDisplay(selectedDateIso)}.",
+                    text = "Nu există lecții înregistrate pentru săptămâna $weekRangeText.",
                     color = colors.textSecondary,
                     fontSize = 14.sp
                 )
             }
         } else {
-            val listState = rememberLazyListState()
-            LaunchedEffect(selectedDateIso, highlightedSubject, dayLessons.size) {
-                if (!highlightedSubject.isNullOrBlank()) {
-                    val targetIdx = dayLessons.indexOfFirst {
-                        GradeCalculator.normalizeSubject(it.subject) ==
-                            GradeCalculator.normalizeSubject(highlightedSubject)
-                    }
-                    if (targetIdx >= 0) {
-                        listState.animateScrollToItem(targetIdx)
+            val initialIdx = weekDays.indexOfFirst { it.toString() == selectedDateIso }
+                .let { if (it >= 0) it else weekDays.lastIndex }
+                .coerceAtLeast(0)
+            val listState = rememberLazyListState(
+                initialFirstVisibleItemIndex = initialIdx,
+                initialFirstVisibleItemScrollOffset = if (initialIdx > 0) -140 else 0
+            )
+
+            LaunchedEffect(selectedDateIso, highlightedSubject, weekHasAnyLessons) {
+                val targetIdx = weekDays.indexOfFirst { it.toString() == selectedDateIso }
+                    .let { if (it >= 0) it else weekDays.lastIndex }
+                if (targetIdx >= 0 && weekHasAnyLessons) {
+                    listState.scrollToItem(targetIdx, scrollOffset = -90)
+                    val viewportHeight = listState.layoutInfo.viewportSize.height
+                    val itemInfo = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIdx }
+                    if (viewportHeight > 0 && itemInfo != null) {
+                        val centerOffset = if (itemInfo.size < viewportHeight) {
+                            -((viewportHeight - itemInfo.size) / 2)
+                        } else {
+                            -12
+                        }
+                        listState.animateScrollToItem(targetIdx, centerOffset)
                     }
                 }
             }
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                items(dayLessons, key = { it.id }) { lesson ->
-                    val isHighlighted = highlightedSubject != null &&
-                        GradeCalculator.normalizeSubject(lesson.subject) ==
-                        GradeCalculator.normalizeSubject(highlightedSubject)
+                itemsIndexed(weekDays, key = { _, day -> day.toString() }) { _, day ->
+                    val dayIso = day.toString()
+                    val isSelectedDay = dayIso == selectedDateIso
+                    val isToday = dayIso == todayIso
+                    val lessonsForDay = scheduleEvents.filter { it.dateIso == dayIso }
 
-                    LessonTimelineCard(
-                        lesson = lesson,
-                        isHighlighted = isHighlighted,
-                        onClick = { onOpenLessonDetail(lesson) }
+                    WeekDayScheduleCard(
+                        day = day,
+                        dayIso = dayIso,
+                        isSelectedDay = isSelectedDay,
+                        isToday = isToday,
+                        lessons = lessonsForDay,
+                        highlightedSubject = if (isSelectedDay) highlightedSubject else null,
+                        onSelectDay = { onSelectDate(dayIso) },
+                        onLessonClick = { lesson ->
+                            onSelectDate(dayIso)
+                            onOpenLessonDetail(lesson)
+                        }
                     )
                 }
-                item { Spacer(modifier = Modifier.height(12.dp)) }
+                item { Spacer(modifier = Modifier.height(14.dp)) }
             }
         }
     }
@@ -279,134 +307,230 @@ fun ScheduleScreen(
 }
 
 @Composable
-private fun LessonTimelineCard(
+private fun WeekDayScheduleCard(
+    day: LocalDate,
+    dayIso: String,
+    isSelectedDay: Boolean,
+    isToday: Boolean,
+    lessons: List<LessonEvent>,
+    highlightedSubject: String?,
+    onSelectDay: () -> Unit,
+    onLessonClick: (LessonEvent) -> Unit
+) {
+    val colors = SimeTheme.colors
+    val dayName = day.dayOfWeek.getDisplayName(TextStyle.FULL, Locale("ro", "MD")).uppercase()
+    val dateShort = GradeCalculator.formatIsoToShortDisplay(dayIso)
+    val countLabel = if (lessons.size == 1) "1 oră" else "${lessons.size} ore"
+
+    SimeCard(
+        isHighlighted = isSelectedDay,
+        backgroundColor = if (isSelectedDay && colors.isDark) Color(0xFF101218) else colors.surface,
+        contentPadding = PaddingValues(0.dp)
+    ) {
+        // Day Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onSelectDay)
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "$dayName  ·  $dateShort",
+                    color = if (isSelectedDay) colors.textPrimary else colors.textSecondary,
+                    fontSize = 12.sp,
+                    letterSpacing = 1.1.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isToday) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(colors.surfaceElevated, RoundedCornerShape(5.dp))
+                            .border(0.75.dp, colors.gradeLowMid.copy(alpha = 0.5f), RoundedCornerShape(5.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "AZI",
+                            color = colors.gradeLowMid,
+                            fontSize = 9.sp,
+                            letterSpacing = 0.9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = countLabel,
+                color = colors.textMuted,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        HairlineDivider()
+
+        if (lessons.isEmpty()) {
+            Text(
+                text = "Nicio lecție înregistrată",
+                color = colors.textMuted,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(14.dp)
+            )
+        } else {
+            lessons.forEachIndexed { idx, lesson ->
+                val isLessonHighlighted = !highlightedSubject.isNullOrBlank() &&
+                    GradeCalculator.normalizeSubject(lesson.subject) ==
+                    GradeCalculator.normalizeSubject(highlightedSubject)
+
+                WeekDayLessonRow(
+                    lesson = lesson,
+                    isHighlighted = isLessonHighlighted,
+                    onClick = { onLessonClick(lesson) }
+                )
+                if (idx < lessons.lastIndex) {
+                    HairlineDivider()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekDayLessonRow(
     lesson: LessonEvent,
     isHighlighted: Boolean,
     onClick: () -> Unit
 ) {
     val colors = SimeTheme.colors
+    val rowBg = if (isHighlighted) {
+        if (colors.isDark) Color.White.copy(alpha = 0.08f) else colors.surfaceElevated
+    } else {
+        Color.Transparent
+    }
 
-    SimeCard(
-        isHighlighted = isHighlighted,
-        backgroundColor = if (isHighlighted && colors.isDark) Color(0xFF13151B) else colors.surface,
-        contentPadding = PaddingValues(14.dp),
-        onClick = onClick
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(rowBg)
+            .clickable(onClick = onClick)
+            .height(IntrinsicSize.Min)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min),
-            verticalAlignment = Alignment.Top
+        // Left period & time column
+        Column(
+            modifier = Modifier.width(50.dp),
+            horizontalAlignment = Alignment.Start
         ) {
-            // Left time & period column
-            Column(
-                modifier = Modifier.width(52.dp),
-                horizontalAlignment = Alignment.Start
-            ) {
+            Text(
+                text = "ORA ${lesson.periodNumber}",
+                color = colors.textMuted,
+                fontSize = 9.sp,
+                letterSpacing = 0.9.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = lesson.startTime,
+                color = colors.textPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = lesson.endTime,
+                color = colors.textMuted,
+                fontSize = 10.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+        VerticalHairlineDivider()
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Middle subject, teacher/room & homework column
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = lesson.subject,
+                color = colors.textPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            val meta = buildList {
+                if (lesson.teacher.isNotBlank()) add(lesson.teacher)
+                if (!lesson.room.isNullOrBlank()) add("Cab. ${lesson.room}")
+            }.joinToString("  ·  ")
+
+            if (meta.isNotBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "ORA ${lesson.periodNumber}",
-                    color = colors.textMuted,
-                    fontSize = 10.sp,
-                    letterSpacing = 1.0.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = lesson.startTime,
-                    color = colors.textPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = lesson.endTime,
-                    color = colors.textMuted,
-                    fontSize = 11.sp
+                    text = meta,
+                    color = colors.textSecondary,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
+            if (!lesson.homeworkSnippet.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Temă: ${lesson.homeworkSnippet}",
+                    color = colors.textMuted,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        // Right evaluation / absence figure
+        if (!lesson.badgeText.isNullOrBlank()) {
             Spacer(modifier = Modifier.width(10.dp))
-            VerticalHairlineDivider()
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Right details column
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
+            if (lesson.isAbsent) {
+                Text(
+                    text = "ABS",
+                    color = colors.absenceUnmotivated,
+                    fontSize = 10.sp,
+                    letterSpacing = 0.8.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            } else if (lesson.numericGrade != null) {
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = lesson.subject,
-                        color = colors.textPrimary,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (!lesson.badgeText.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.width(10.dp))
-                        if (lesson.isAbsent) {
-                            Text(
-                                text = "ABSENȚĂ",
-                                color = colors.absenceUnmotivated,
-                                fontSize = 10.sp,
-                                letterSpacing = 0.8.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        } else {
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = "NOTA",
-                                    color = colors.textMuted,
-                                    fontSize = 9.sp,
-                                    letterSpacing = 1.0.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = lesson.badgeText,
-                                    color = colors.textPrimary,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
-                }
-
-                val meta = buildList {
-                    if (lesson.teacher.isNotBlank()) add(lesson.teacher)
-                    if (!lesson.room.isNullOrBlank()) add("Cab. ${lesson.room}")
-                }.joinToString("  ·  ")
-
-                if (meta.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = meta,
-                        color = colors.textSecondary,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                if (!lesson.homeworkSnippet.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    HairlineDivider()
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "TEMĂ",
+                        text = "NOTA",
                         color = colors.textMuted,
-                        fontSize = 9.sp,
-                        letterSpacing = 1.1.sp,
+                        fontSize = 8.sp,
+                        letterSpacing = 0.9.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = lesson.homeworkSnippet,
-                        color = colors.textSecondary,
-                        fontSize = 12.sp,
-                        lineHeight = 17.sp
+                        text = lesson.badgeText,
+                        color = colors.textPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
+            } else {
+                Text(
+                    text = lesson.badgeText,
+                    color = colors.textPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     }

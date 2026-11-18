@@ -137,7 +137,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectTab(tab: AppTab) {
         _selectedTab.value = tab
-        if (tab != AppTab.SCHEDULE) {
+        if (tab == AppTab.SCHEDULE) {
+            ensureWeekLoaded(_selectedScheduleDateIso.value)
+        } else {
             _highlightedLessonSubject.value = null
         }
         if (tab == AppTab.MESSAGES) {

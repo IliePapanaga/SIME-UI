@@ -31,6 +31,8 @@ private fun sampleDateIso(offsetFromMonday: Long): String {
 
 private fun sampleLessons(): List<LessonEvent> {
     val mon = sampleDateIso(0)
+    val tue = sampleDateIso(1)
+    val wed = sampleDateIso(2)
     return listOf(
         LessonEvent(
             id = "1",
@@ -66,15 +68,47 @@ private fun sampleLessons(): List<LessonEvent> {
         ),
         LessonEvent(
             id = "3",
-            dateIso = mon,
-            dateDisplay = mon,
-            periodNumber = 3,
-            startTime = "10:20",
-            endTime = "11:05",
+            dateIso = tue,
+            dateDisplay = tue,
+            periodNumber = 1,
+            startTime = "08:30",
+            endTime = "09:15",
+            subject = "Limba română",
+            room = "108",
+            teacher = "Prof. Cotorcea S.",
+            homeworkSnippet = null,
+            badgeText = null,
+            numericGrade = null,
+            isAbsent = false,
+            detailUrl = null
+        ),
+        LessonEvent(
+            id = "4",
+            dateIso = tue,
+            dateDisplay = tue,
+            periodNumber = 2,
+            startTime = "09:25",
+            endTime = "10:10",
             subject = "Informatica",
             room = "202",
             teacher = "Prof. Uzunova L.",
             homeworkSnippet = "Algoritmi de sortare pe matrice.",
+            badgeText = "10",
+            numericGrade = 10,
+            isAbsent = false,
+            detailUrl = null
+        ),
+        LessonEvent(
+            id = "5",
+            dateIso = wed,
+            dateDisplay = wed,
+            periodNumber = 1,
+            startTime = "08:30",
+            endTime = "09:15",
+            subject = "Fizica. Astronomia",
+            room = "214",
+            teacher = "Prof. Țurcan M.",
+            homeworkSnippet = "Probleme cap. III, pag. 72.",
             badgeText = null,
             numericGrade = null,
             isAbsent = false,
@@ -233,8 +267,8 @@ fun SchedulePreview() {
         Box(modifier = Modifier.fillMaxSize().background(SimeTheme.colors.background)) {
             ScheduleScreen(
                 scheduleEvents = sampleLessons(),
-                selectedDateIso = sampleDateIso(0),
-                highlightedSubject = "Chimie",
+                selectedDateIso = sampleDateIso(1),
+                highlightedSubject = "Informatica",
                 lessonDetailState = null,
                 onSelectDate = {},
                 onOpenLessonDetail = {},
