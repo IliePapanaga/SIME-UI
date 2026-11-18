@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import md.sime.agenda.model.DatedGrade
 import md.sime.agenda.model.GradeCalculator
 import md.sime.agenda.model.PortalSnapshot
+import md.sime.agenda.model.SubjectEvaluationType
 import md.sime.agenda.model.SubjectGrades
 import md.sime.agenda.ui.components.HairlineDivider
 import md.sime.agenda.ui.components.SegmentedGlassToggle
@@ -208,8 +209,10 @@ fun GradesScreen(
             items(subjects, key = { "${it.semester}_${it.subject}" }) { subject ->
                 val hasSimSubject = simulatedMarks[subject.subject].orEmpty().isNotEmpty() ||
                     simulatedQualifiers[subject.subject].orEmpty().isNotEmpty()
+                val evalType = GradeCalculator.getEvaluationType(subject, subjects)
                 SubjectGradesCard(
                     subject = subject,
+                    evaluationType = evalType,
                     isSimExpanded = isSimulatorMode,
                     hasSimulated = hasSimSubject,
                     onAddSimulatedMark = { mark -> onAddSimulatedMark(subject.subject, mark) },
@@ -238,6 +241,7 @@ fun GradesScreen(
 @Composable
 private fun SubjectGradesCard(
     subject: SubjectGrades,
+    evaluationType: SubjectEvaluationType,
     isSimExpanded: Boolean,
     hasSimulated: Boolean,
     onAddSimulatedMark: (Int) -> Unit,
@@ -246,8 +250,7 @@ private fun SubjectGradesCard(
     onGradeClick: (DatedGrade) -> Unit
 ) {
     val colors = SimeTheme.colors
-    val isQualifier = GradeCalculator.isQualifierSubject(subject)
-    val qualifierSummary = if (isQualifier) {
+    val qualifierSummary = if (evaluationType == SubjectEvaluationType.QUALIFIER) {
         GradeCalculator.calculateQualifierSummary(subject.qualifiers, subject.officialAverage)
     } else {
         null
@@ -287,20 +290,31 @@ private fun SubjectGradesCard(
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            if (isQualifier) {
-                Text(
-                    text = qualifierSummary ?: "—",
-                    color = if (hasSimulated) colors.gradeLowMid else colors.textPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            } else {
-                Text(
-                    text = GradeCalculator.formatAverage(subject.liveAverage),
-                    color = if (hasSimulated) colors.gradeLowMid else colors.textPrimary,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+            when (evaluationType) {
+                SubjectEvaluationType.QUALIFIER -> {
+                    Text(
+                        text = qualifierSummary ?: "—",
+                        color = if (hasSimulated) colors.gradeLowMid else colors.textPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                SubjectEvaluationType.DESCRIPTOR_ONLY -> {
+                    Text(
+                        text = "Descriptori",
+                        color = colors.textMuted,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                SubjectEvaluationType.NUMERIC -> {
+                    Text(
+                        text = GradeCalculator.formatAverage(subject.liveAverage),
+                        color = if (hasSimulated) colors.gradeLowMid else colors.textPrimary,
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
 
@@ -353,15 +367,20 @@ private fun SubjectGradesCard(
             }
         } else {
             Spacer(modifier = Modifier.height(8.dp))
+            val emptyText = when (evaluationType) {
+                SubjectEvaluationType.DESCRIPTOR_ONLY -> "Evaluare prin descriptori (fără note sau calificative)"
+                SubjectEvaluationType.QUALIFIER -> "Niciun calificativ înregistrat"
+                SubjectEvaluationType.NUMERIC -> "Nicio notă înregistrată"
+            }
             Text(
-                text = if (isQualifier) "Niciun calificativ înregistrat" else "Nicio notă înregistrată",
+                text = emptyText,
                 color = colors.textMuted,
                 fontSize = 12.sp
             )
         }
 
-        // Live Simulator Row (Qualifiers for descriptor subjects, Numeric marks otherwise)
-        if (isSimExpanded) {
+        // Live Simulator Row (Qualifiers for descriptor/art/PE subjects, Numeric marks otherwise; hidden for descriptor-only)
+        if (isSimExpanded && evaluationType != SubjectEvaluationType.DESCRIPTOR_ONLY) {
             Spacer(modifier = Modifier.height(10.dp))
             Row(
                 modifier = Modifier
@@ -372,7 +391,7 @@ private fun SubjectGradesCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (isQualifier) {
+                if (evaluationType == SubjectEvaluationType.QUALIFIER) {
                     FlowRow(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),

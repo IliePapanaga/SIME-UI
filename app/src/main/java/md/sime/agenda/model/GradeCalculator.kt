@@ -11,21 +11,47 @@ object GradeCalculator {
     private val displayDateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.ROOT)
     private val isoDateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
+    private val descriptorOnlySubjectKeywords = listOf(
+        "dezvoltare personala",
+        "educatie pentru societate"
+    )
+
     private val qualifierSubjectKeywords = listOf(
         "educatie fizica",
-        "dezvoltare personala",
-        "educatie pentru societate",
         "educatie muzicala",
         "educatie plastica",
         "educatie tehnologica"
     )
 
-    fun isQualifierSubject(subject: SubjectGrades): Boolean {
-        if (subject.qualifiers.isNotEmpty() && subject.numericGrades.isEmpty()) return true
-        if (subject.numericGrades.isNotEmpty()) return false
+    fun getEvaluationType(
+        subject: SubjectGrades,
+        allSemesterSubjects: List<SubjectGrades> = emptyList()
+    ): SubjectEvaluationType {
+        if (subject.numericGrades.isNotEmpty() || subject.teza != null) {
+            return SubjectEvaluationType.NUMERIC
+        }
+        if (subject.qualifiers.isNotEmpty()) {
+            return SubjectEvaluationType.QUALIFIER
+        }
         val norm = normalizeSubject(subject.subject)
-        return qualifierSubjectKeywords.any { norm.contains(it) }
+        if (descriptorOnlySubjectKeywords.any { norm.contains(it) }) {
+            return SubjectEvaluationType.DESCRIPTOR_ONLY
+        }
+        if (qualifierSubjectKeywords.any { norm.contains(it) }) {
+            return SubjectEvaluationType.QUALIFIER
+        }
+        if (
+            allSemesterSubjects.isNotEmpty() &&
+            allSemesterSubjects.any { it.qualifiers.isNotEmpty() } &&
+            allSemesterSubjects.none { it.numericGrades.isNotEmpty() }
+        ) {
+            return SubjectEvaluationType.QUALIFIER
+        }
+        return SubjectEvaluationType.NUMERIC
     }
+
+    fun isQualifierSubject(subject: SubjectGrades): Boolean =
+        getEvaluationType(subject) == SubjectEvaluationType.QUALIFIER
 
     fun canonicalQualifier(raw: String): String? {
         val norm = normalizeSubject(raw)

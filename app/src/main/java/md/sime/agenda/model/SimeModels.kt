@@ -197,3 +197,9 @@ data class AppUpdateInfo(
     val versionName: String,
     val downloadUrl: String
 )
+
+enum class SubjectEvaluationType {
+    NUMERIC,
+    QUALIFIER,
+    DESCRIPTOR_ONLY
+}

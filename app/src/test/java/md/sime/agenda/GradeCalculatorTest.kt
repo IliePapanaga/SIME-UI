@@ -6,6 +6,7 @@ import md.sime.agenda.model.DailyAbsence
 import md.sime.agenda.model.DatedGrade
 import md.sime.agenda.model.GradeCalculator
 import md.sime.agenda.model.LessonEvent
+import md.sime.agenda.model.SubjectEvaluationType
 import md.sime.agenda.model.SubjectGrades
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -174,5 +175,26 @@ class GradeCalculatorTest {
             liveAverage = 10.0
         )
         assertFalse(GradeCalculator.isQualifierSubject(math))
+        assertEquals(SubjectEvaluationType.NUMERIC, GradeCalculator.getEvaluationType(math))
+
+        val edSoc = SubjectGrades(
+            semester = 1,
+            subject = "Educație pentru societate",
+            rawEntries = emptyList(),
+            datedGrades = emptyList(),
+            numericGrades = emptyList(),
+            qualifiers = emptyList(),
+            teza = null,
+            tezaRaw = null,
+            officialAverage = null,
+            liveAverage = null
+        )
+        val dezv = edSoc.copy(subject = "Dezvoltare personală")
+        val litUniv = edSoc.copy(subject = "Literatura universală")
+
+        assertEquals(SubjectEvaluationType.QUALIFIER, GradeCalculator.getEvaluationType(pe))
+        assertEquals(SubjectEvaluationType.DESCRIPTOR_ONLY, GradeCalculator.getEvaluationType(edSoc))
+        assertEquals(SubjectEvaluationType.DESCRIPTOR_ONLY, GradeCalculator.getEvaluationType(dezv))
+        assertEquals(SubjectEvaluationType.NUMERIC, GradeCalculator.getEvaluationType(litUniv))
     }
 }
