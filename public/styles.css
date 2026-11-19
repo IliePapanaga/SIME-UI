@@ -1,5 +1,6 @@
 :root,
 html[data-theme="amoled"] {
+  color-scheme: dark;
   --bg: #000000;
   --surface: #0a0b0e;
   --surface-elevated: #121318;
@@ -39,6 +40,7 @@ html[data-theme="amoled"] {
 }
 
 html[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #090a0d;
   --surface: #111318;
   --surface-elevated: #181b22;
@@ -78,6 +80,7 @@ html[data-theme="dark"] {
 }
 
 html[data-theme="light"] {
+  color-scheme: light;
   --bg: #f3f4f6;
   --surface: #ffffff;
   --surface-elevated: #eaecef;
@@ -1031,14 +1034,36 @@ html[data-theme="light"] .abs-filter-chip {
   width: 100%;
   padding: 12px 13px;
   border-radius: 10px;
-  background: var(--bg);
-  border: 0.75px solid var(--border);
-  font-size: 15px;
+  background-color: var(--surface-elevated);
+  color: var(--text-primary);
+  caret-color: var(--text-primary);
+  border: 1px solid var(--glass-border-strong);
+  font-size: 16px;
   outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+}
+
+.text-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
 }
 
 .text-input:focus {
   border-color: var(--text-primary);
+}
+
+.text-input:-webkit-autofill,
+.text-input:-webkit-autofill:hover,
+.text-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-primary);
+  caret-color: var(--text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface-elevated) inset;
+  box-shadow: 0 0 0 1000px var(--surface-elevated) inset;
+  transition: background-color 9999s ease-out 0s;
 }
 
 .btn-primary {

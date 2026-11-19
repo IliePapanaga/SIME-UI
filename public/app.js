@@ -33,7 +33,9 @@
   });
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register("/sw.js").then((reg) => {
+      if (reg && typeof reg.update === "function") reg.update().catch(() => {});
+    }).catch(() => {});
   }
 
   function loadJson(key, fallback) {
@@ -95,6 +97,7 @@
 
   let eventsByDate = new Map();
   let eventsById = new Map();
+  let syncEpoch = 0;
 
   function rebuildSnapshotIndex(snap) {
     eventsByDate = new Map();
@@ -340,9 +343,10 @@
   async function syncPortal({ silent = false } = {}) {
     if (!state.creds && !state.sessionToken) return;
     if (state.isSyncing) return;
+    const epoch = syncEpoch;
     state.isSyncing = true;
     state.syncError = null;
-    render();
+    if (isLoggedIn()) render({ part: "chrome" });
     try {
       const data = await apiCall({
         action: "sync",
@@ -351,39 +355,48 @@
         userType: state.creds?.userType || 2,
         sessionToken: state.sessionToken
       });
+      if (epoch !== syncEpoch) return;
       state.snapshot = data.snapshot;
       state.sessionToken = data.sessionToken;
       rebuildSnapshotIndex(data.snapshot);
       saveJson(STORAGE_SNAPSHOT, data.snapshot);
       saveJson(STORAGE_TOKEN, data.sessionToken);
     } catch (err) {
+      if (epoch !== syncEpoch) return;
       if (!silent || !state.snapshot) {
         state.syncError = err.message || "Sincronizarea a eșuat.";
       }
     } finally {
-      state.isSyncing = false;
-      render({ part: "all" });
+      if (epoch === syncEpoch) {
+        state.isSyncing = false;
+        if (isLoggedIn()) render({ part: "all" });
+      }
     }
   }
 
   async function handleLoginSubmit(username, password, userType, stayLoggedIn) {
-    if (!username.trim() || !password) {
+    const domUser = document.getElementById("inpUser")?.value;
+    const domPass = document.getElementById("inpPass")?.value;
+    const finalUser = String(username || domUser || "").trim();
+    const finalPass = String(password || domPass || "");
+    if (!finalUser || !finalPass) {
       state.loginError = "Introdu numele de utilizator și parola.";
       render({ part: "all" });
       return;
     }
+    syncEpoch++;
     state.loginLoading = true;
     state.loginError = null;
     render({ part: "all" });
     try {
       const data = await apiCall({
         action: "sync",
-        username: username.trim(),
-        password,
+        username: finalUser,
+        password: finalPass,
         userType
       });
       if (stayLoggedIn) {
-        state.creds = { username: username.trim(), password, userType, stayLoggedIn: true };
+        state.creds = { username: finalUser, password: finalPass, userType, stayLoggedIn: true };
         saveJson(STORAGE_CREDS, state.creds);
       } else {
         state.creds = null;
@@ -510,7 +523,7 @@
         <p class="secondary" style="margin:0 0 22px;font-size:14px;">Conectează-te la catalogul tău școlar de pe orice dispozitiv</p>
 
         ${saved ? `
-          <div class="glass-card highlighted" style="padding:16px;margin-bottom:16px;">
+          <div id="savedCardBox" class="glass-card highlighted" style="padding:16px;margin-bottom:16px;">
             <div class="kicker">CONT SALVAT LOCAL</div>
             <div style="font-size:16px;font-weight:600;margin:5px 0 14px;">${esc(saved.username)} · ${saved.userType === 1 ? "Părinte" : "Elev"}</div>
             <button id="btnOneTap" class="btn-primary" ${state.loginLoading ? "disabled" : ""}>
@@ -528,14 +541,14 @@
 
           <div class="input-group">
             <label class="kicker" for="inpUser">Nume utilizator</label>
-            <input id="inpUser" class="text-input" type="text" autocomplete="username" value="${esc(state.loginUsername)}" ${state.loginLoading ? "disabled" : ""} />
+            <input id="inpUser" class="text-input" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex: ipapanaga6" value="${esc(state.loginUsername)}" />
           </div>
 
           <div class="input-group">
             <label class="kicker" for="inpPass">Parolă</label>
             <div style="position:relative;">
-              <input id="inpPass" class="text-input" type="${state.loginShowPassword ? "text" : "password"}" autocomplete="current-password" value="${esc(state.loginPassword)}" style="padding-right:64px;" ${state.loginLoading ? "disabled" : ""} />
-              <button type="button" id="togglePass" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-secondary);font-size:12px;cursor:pointer;">
+              <input id="inpPass" class="text-input" type="${state.loginShowPassword ? "text" : "password"}" autocomplete="current-password" placeholder="Introdu parola" value="${esc(state.loginPassword)}" style="padding-right:70px;" />
+              <button type="button" id="togglePass" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:3;background:none;border:none;color:var(--text-secondary);font-size:12px;cursor:pointer;padding:6px 4px;">
                 ${state.loginShowPassword ? "Ascunde" : "Arată"}
               </button>
             </div>
@@ -549,9 +562,9 @@
             <input id="chkStay" type="checkbox" checked style="width:18px;height:18px;accent-color:var(--text-primary);" />
           </label>
 
-          ${state.loginError ? `<div class="rose" style="font-size:13px;">${esc(state.loginError)}</div>` : ""}
+          <div id="loginErrorSlot">${state.loginError ? `<div class="rose" style="font-size:13px;">${esc(state.loginError)}</div>` : ""}</div>
 
-          <button type="submit" class="${saved ? "btn-outline" : "btn-primary"}" ${state.loginLoading ? "disabled" : ""}>
+          <button id="btnLoginSubmit" type="submit" class="${saved ? "btn-outline" : "btn-primary"}" ${state.loginLoading ? "disabled" : ""}>
             ${state.loginLoading ? "Se autentifică..." : saved ? "Autentificare cu aceste date" : "Autentificare"}
           </button>
         </form>
@@ -1371,6 +1384,42 @@
     }
   }
 
+  let loginMounted = false;
+
+  function updateLoginDomInPlace() {
+    document.querySelectorAll("[data-ut]").forEach((btn) => {
+      const ut = Number(btn.getAttribute("data-ut"));
+      btn.classList.toggle("active", ut === state.loginUserType);
+    });
+    const inpPass = document.getElementById("inpPass");
+    if (inpPass) {
+      const nextType = state.loginShowPassword ? "text" : "password";
+      if (inpPass.type !== nextType) inpPass.type = nextType;
+    }
+    const togglePass = document.getElementById("togglePass");
+    if (togglePass) {
+      togglePass.textContent = state.loginShowPassword ? "Ascunde" : "Arată";
+    }
+    const errSlot = document.getElementById("loginErrorSlot");
+    if (errSlot) {
+      errSlot.innerHTML = state.loginError
+        ? `<div class="rose" style="font-size:13px;">${esc(state.loginError)}</div>`
+        : "";
+    }
+    const btnSubmit = document.getElementById("btnLoginSubmit");
+    if (btnSubmit) {
+      btnSubmit.disabled = state.loginLoading;
+      btnSubmit.textContent = state.loginLoading
+        ? "Se autentifică..."
+        : (state.creds ? "Autentificare cu aceste date" : "Autentificare");
+    }
+    const btnOneTap = document.getElementById("btnOneTap");
+    if (btnOneTap) {
+      btnOneTap.disabled = state.loginLoading;
+      btnOneTap.textContent = state.loginLoading ? "Se conectează..." : "Intră cu o singură apăsare";
+    }
+  }
+
   function render({ part = "all" } = {}) {
     const root = document.getElementById("app");
     if (!root) return;
@@ -1379,9 +1428,17 @@
       shellMounted = false;
       lastShellProfileKey = null;
       lastRenderedTab = null;
-      root.innerHTML = renderLogin();
+      const formExists = loginMounted && Boolean(document.getElementById("loginForm"));
+      const hasSavedBox = Boolean(document.getElementById("savedCardBox"));
+      if (!formExists || hasSavedBox !== Boolean(state.creds)) {
+        root.innerHTML = renderLogin();
+        loginMounted = true;
+      } else {
+        updateLoginDomInPlace();
+      }
       return;
     }
+    loginMounted = false;
 
     const p = state.snapshot.profile || {};
     const classSuffix = p.className ? `AGENDA · ${p.className}` : "AGENDA";
@@ -1511,7 +1568,11 @@
       if (e.target && e.target.id === "loginForm") {
         e.preventDefault();
         const chk = document.getElementById("chkStay");
-        handleLoginSubmit(state.loginUsername, state.loginPassword, state.loginUserType, chk ? chk.checked : true);
+        const domUser = document.getElementById("inpUser")?.value ?? state.loginUsername;
+        const domPass = document.getElementById("inpPass")?.value ?? state.loginPassword;
+        state.loginUsername = domUser;
+        state.loginPassword = domPass;
+        handleLoginSubmit(domUser, domPass, state.loginUserType, chk ? chk.checked : true);
       }
     });
 
@@ -1714,19 +1775,27 @@
         return;
       }
       if (target.closest("#btnLogoutKeep")) {
+        syncEpoch++;
+        state.isSyncing = false;
         state.showDossier = false;
         state.snapshot = null;
         state.sessionToken = null;
+        loginMounted = false;
         saveJson(STORAGE_SNAPSHOT, null);
         saveJson(STORAGE_TOKEN, null);
         render({ part: "all" });
         return;
       }
       if (target.closest("#btnLogoutForget")) {
+        syncEpoch++;
+        state.isSyncing = false;
         state.showDossier = false;
         state.snapshot = null;
         state.sessionToken = null;
         state.creds = null;
+        state.loginUsername = "";
+        state.loginPassword = "";
+        loginMounted = false;
         saveJson(STORAGE_SNAPSHOT, null);
         saveJson(STORAGE_TOKEN, null);
         saveJson(STORAGE_CREDS, null);
