@@ -1216,10 +1216,6 @@
   function renderDossierModal() {
     if (!state.showDossier) return "";
     const p = state.snapshot?.profile || {};
-    const teachers = (state.snapshot?.teachers || []).filter((t) => {
-      const q = state.teacherQuery.trim().toLowerCase();
-      return !q || t.subject.toLowerCase().includes(q) || t.teacherName.toLowerCase().includes(q);
-    });
 
     const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
@@ -1284,9 +1280,8 @@
           ${(state.snapshot?.teachers?.length || 0) > 0 ? `
             <div style="display:flex;flex-direction:column;gap:8px;">
               <div class="kicker">DISCIPLINE ȘI PROFESORI</div>
-              <input id="inpTeacherSearch" class="text-input" placeholder="Caută disciplină sau profesor" value="${esc(state.teacherQuery)}" />
               <div id="teacherList" class="glass-card" style="background:var(--bg);">
-                ${renderTeacherRows(state.teacherQuery)}
+                ${renderTeacherRows()}
               </div>
             </div>
           ` : ""}
@@ -1298,11 +1293,8 @@
     `;
   }
 
-  function renderTeacherRows(query) {
-    const q = String(query || "").trim().toLowerCase();
-    const teachers = (state.snapshot?.teachers || []).filter(
-      (t) => !q || t.subject.toLowerCase().includes(q) || t.teacherName.toLowerCase().includes(q)
-    );
+  function renderTeacherRows() {
+    const teachers = state.snapshot?.teachers || [];
     if (teachers.length === 0) {
       return `<div class="muted" style="padding:10px 12px;font-size:13px;">Niciun rezultat</div>`;
     }
@@ -1624,10 +1616,6 @@
         state.loginUsername = t.value;
       } else if (t.id === "inpPass") {
         state.loginPassword = t.value;
-      } else if (t.id === "inpTeacherSearch") {
-        state.teacherQuery = t.value;
-        const listEl = document.getElementById("teacherList");
-        if (listEl) listEl.innerHTML = renderTeacherRows(state.teacherQuery);
       }
     });
 
