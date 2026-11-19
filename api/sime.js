@@ -529,6 +529,30 @@ function extractTagByClass(html, cls) {
   return m ? m[2] : "";
 }
 
+function hasCatalogIdParam(url) {
+  return Boolean(url && /[?&]p19_catalog_id=[^&]+/.test(url));
+}
+
+function mergeCalendarEvent(prev, next) {
+  const prevHasCatalog = hasCatalogIdParam(prev.detailUrl);
+  const nextHasCatalog = hasCatalogIdParam(next.detailUrl);
+  const detailUrl = nextHasCatalog && !prevHasCatalog
+    ? next.detailUrl
+    : (prev.detailUrl || next.detailUrl);
+  return {
+    ...prev,
+    startTime: prev.startTime || next.startTime,
+    endTime: prev.endTime || next.endTime,
+    room: prev.room || next.room || null,
+    teacher: prev.teacher || next.teacher,
+    homeworkSnippet: prev.homeworkSnippet || next.homeworkSnippet || null,
+    badgeText: prev.badgeText || next.badgeText || null,
+    numericGrade: prev.numericGrade != null ? prev.numericGrade : next.numericGrade,
+    isAbsent: Boolean(prev.isAbsent || next.isAbsent),
+    detailUrl
+  };
+}
+
 function parseCalendarEventsArray(jsonStr) {
   let arr;
   try {
@@ -538,7 +562,7 @@ function parseCalendarEventsArray(jsonStr) {
   }
   if (!Array.isArray(arr)) return [];
 
-  const events = [];
+  const eventsById = new Map();
   for (let i = 0; i < arr.length; i++) {
     const obj = arr[i];
     if (!obj) continue;
@@ -569,7 +593,7 @@ function parseCalendarEventsArray(jsonStr) {
     const isAbsent = badgeText ? badgeText.toLowerCase() === "a" : false;
     const detailUrl = extractDialogUrl(obj.url || "");
 
-    events.push({
+    const event = {
       id: `${dateIso}_${periodNumber}_${subject}`,
       dateIso,
       dateDisplay,
@@ -584,10 +608,12 @@ function parseCalendarEventsArray(jsonStr) {
       numericGrade,
       isAbsent,
       detailUrl
-    });
+    };
+    const existing = eventsById.get(event.id);
+    eventsById.set(event.id, existing ? mergeCalendarEvent(existing, event) : event);
   }
 
-  return events.sort((a, b) => a.dateIso.localeCompare(b.dateIso) || a.periodNumber - b.periodNumber);
+  return Array.from(eventsById.values()).sort((a, b) => a.dateIso.localeCompare(b.dateIso) || a.periodNumber - b.periodNumber);
 }
 
 function parseMainPageData(mc, sem1Html, sem2Html, calJsonStr, messagesHtml = "") {
@@ -642,22 +668,33 @@ function parseMainPageData(mc, sem1Html, sem2Html, calJsonStr, messagesHtml = ""
 
   // Multi-student options
   const studentOptions = [];
-  const navMatch = mc.match(/<nav[^>]*aria-label=["']Application["'][^>]*>([\s\S]*?)<\/nav>/i) ||
+  const seenStudentIds = new Set();
+  const navMatch = mc.match(/id=["']t_TreeNav["'][^>]*>([\s\S]*?)<\/ul>/i) ||
+    mc.match(/<nav[^>]*aria-label=["']Application["'][^>]*>([\s\S]*?)<\/nav>/i) ||
     mc.match(/class=["'][^"']*t-TreeNav[^"']*["'][^>]*>([\s\S]*?)<\/ul>/i);
   if (navMatch) {
     for (const am of navMatch[1].matchAll(/<li([^>]*)>\s*<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
       const liAttrs = am[1] || "";
       const href = decodeHtml(am[2]).trim();
-      const name = stripInlineTags(am[3]);
+      const name = stripInlineTags(am[3]).replace(/\[.*?\]/g, "").replace(/\s+/g, " ").trim();
       if (!name || !href) continue;
       const idM = href.match(/user_eleve_id=([A-Za-z0-9]+)/);
+      const id = idM ? idM[1] : name;
+      if (seenStudentIds.has(id)) continue;
+      seenStudentIds.add(id);
       studentOptions.push({
-        id: idM ? idM[1] : name,
+        id,
         name,
         switchUrl: href.startsWith("http") ? href : `${SIME_BASE}${href}`,
-        isSelected: /is-current/.test(liAttrs)
+        isSelected: /is-current/i.test(liAttrs) || /data-current=["']true["']/i.test(liAttrs)
       });
     }
+  }
+  if (studentOptions.length > 0 && !studentOptions.some((opt) => opt.isSelected)) {
+    const normFull = fullName.replace(/\s+/g, " ").trim().toLowerCase();
+    const matched = (normFull && studentOptions.find((opt) => opt.name.toLowerCase() === normFull))
+      || (studentOptions.length === 1 ? studentOptions[0] : null);
+    if (matched) matched.isSelected = true;
   }
 
   // Presence
@@ -1204,6 +1241,10 @@ async function handleLessonDetail(body) {
 
 const inflightRequests = new Map();
 
+function sha256Hex(parts) {
+  return crypto.createHash("sha256").update(parts.join("\0")).digest("hex");
+}
+
 function buildRequestCoalesceKey(action, body) {
   const authParts = [
     String(body.userType ?? 2),
@@ -1213,19 +1254,19 @@ function buildRequestCoalesceKey(action, body) {
     String(body.sessionToken?.cookie || "")
   ];
   if (action === "sync") {
-    const digest = crypto.createHash("sha256").update(authParts.join("\0")).digest("hex");
-    return `sync:${digest}`;
+    return `sync:${sha256Hex(authParts)}`;
   }
   if (action === "lessonDetail") {
-    const parts = [
+    return `detail:${sha256Hex([
       ...authParts,
       String(body.detailUrl || ""),
       String(body.dateIso || ""),
       String(body.periodNumber ?? ""),
       String(body.subject || "")
-    ];
-    const digest = crypto.createHash("sha256").update(parts.join("\0")).digest("hex");
-    return `detail:${digest}`;
+    ])}`;
+  }
+  if (action === "switchStudent") {
+    return `switch:${sha256Hex([...authParts, String(body.switchUrl || "")])}`;
   }
   return "";
 }
@@ -1263,7 +1304,7 @@ module.exports = async function handler(req, res) {
     } else if (action === "lessonDetail") {
       result = await coalesceInflight(buildRequestCoalesceKey("lessonDetail", body), () => handleLessonDetail(body));
     } else if (action === "switchStudent") {
-      result = await handleSwitchStudent(body);
+      result = await coalesceInflight(buildRequestCoalesceKey("switchStudent", body), () => handleSwitchStudent(body));
     } else {
       return res.status(400).json({ error: `Unknown action: ${action}` });
     }

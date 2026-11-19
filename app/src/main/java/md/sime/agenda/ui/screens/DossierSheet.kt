@@ -33,6 +33,7 @@ import md.sime.agenda.model.PortalSnapshot
 import md.sime.agenda.model.ThemeMode
 import md.sime.agenda.notifications.AppUpdateChecker
 import md.sime.agenda.ui.components.HairlineDivider
+import md.sime.agenda.ui.components.PillToggle
 import md.sime.agenda.ui.components.SegmentedGlassToggle
 import md.sime.agenda.ui.components.SimeCard
 import md.sime.agenda.ui.theme.SimeTheme
@@ -84,6 +85,26 @@ fun DossierSheet(
                             color = colors.textSecondary,
                             fontSize = 13.sp
                         )
+                    }
+                }
+
+                // Multi-student switcher (if parent account has >1 child)
+                if (snapshot.studentOptions.size > 1) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Schimbă elevul",
+                            color = colors.textMuted,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        snapshot.studentOptions.forEach { opt ->
+                            PillToggle(
+                                label = opt.name,
+                                selected = opt.isSelected,
+                                onClick = { onSwitchStudent(opt.switchUrl) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
 

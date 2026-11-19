@@ -132,12 +132,16 @@ object SimeHtmlParser {
     }
 
     private fun parseStudentOptions(doc: Document): List<StudentOption> {
-        return doc.select(".t-TreeNav a, nav[aria-label='Application'] a").mapNotNull { link ->
+        val seenIds = HashSet<String>()
+        return doc.select("#t_TreeNav a, .t-TreeNav a, nav[aria-label='Application'] a").mapNotNull { link ->
             val href = link.attr("href").trim()
-            val name = link.text().trim()
+            val name = link.text().replace(Regex("\\[.*?]"), "").trim()
             if (name.isBlank() || href.isBlank()) return@mapNotNull null
             val id = Regex("user_eleve_id=([A-Za-z0-9]+)").find(href)?.groupValues?.get(1) ?: name
-            val selected = link.closest("li")?.hasClass("is-current") == true ||
+            if (!seenIds.add(id)) return@mapNotNull null
+            val li = link.closest("li")
+            val selected = li?.hasClass("is-current") == true ||
+                li?.attr("data-current")?.equals("true", ignoreCase = true) == true ||
                 link.attr("aria-selected") == "true"
             StudentOption(id = id, name = name, switchUrl = href, isSelected = selected)
         }
@@ -443,11 +447,37 @@ object SimeHtmlParser {
         }
     }
 
+    private fun hasCatalogIdParam(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        return Regex("[?&]p19_catalog_id=[^&]+").containsMatchIn(url)
+    }
+
+    private fun mergeLessonEvents(prev: LessonEvent, next: LessonEvent): LessonEvent {
+        val prevHasCatalog = hasCatalogIdParam(prev.detailUrl)
+        val nextHasCatalog = hasCatalogIdParam(next.detailUrl)
+        val mergedDetailUrl = if (nextHasCatalog && !prevHasCatalog) {
+            next.detailUrl
+        } else {
+            prev.detailUrl ?: next.detailUrl
+        }
+        return prev.copy(
+            startTime = prev.startTime.ifBlank { next.startTime },
+            endTime = prev.endTime.ifBlank { next.endTime },
+            room = prev.room ?: next.room,
+            teacher = prev.teacher.ifBlank { next.teacher },
+            homeworkSnippet = prev.homeworkSnippet ?: next.homeworkSnippet,
+            badgeText = prev.badgeText ?: next.badgeText,
+            numericGrade = prev.numericGrade ?: next.numericGrade,
+            isAbsent = prev.isAbsent || next.isAbsent,
+            detailUrl = mergedDetailUrl
+        )
+    }
+
     fun parseCalendarEventsJson(jsonArrayStr: String): List<LessonEvent> {
         val trimmed = jsonArrayStr.trim()
         if (!trimmed.startsWith("[")) return emptyList()
         val array = JSONArray(trimmed)
-        val events = mutableListOf<LessonEvent>()
+        val eventsById = LinkedHashMap<String, LessonEvent>()
 
         for (i in 0 until array.length()) {
             val obj = array.optJSONObject(i) ?: continue
@@ -480,27 +510,26 @@ object SimeHtmlParser {
 
             val detailUrl = extractDialogUrl(rawUrl)
             val id = "${dateIso}_${order}_$subject"
-
-            events.add(
-                LessonEvent(
-                    id = id,
-                    dateIso = dateIso,
-                    dateDisplay = dateDisplay,
-                    periodNumber = order,
-                    startTime = startTime,
-                    endTime = endTime,
-                    subject = subject,
-                    room = room,
-                    teacher = teacher,
-                    homeworkSnippet = homework,
-                    badgeText = gradeBadge,
-                    numericGrade = numericGrade,
-                    isAbsent = isAbsent,
-                    detailUrl = detailUrl
-                )
+            val event = LessonEvent(
+                id = id,
+                dateIso = dateIso,
+                dateDisplay = dateDisplay,
+                periodNumber = order,
+                startTime = startTime,
+                endTime = endTime,
+                subject = subject,
+                room = room,
+                teacher = teacher,
+                homeworkSnippet = homework,
+                badgeText = gradeBadge,
+                numericGrade = numericGrade,
+                isAbsent = isAbsent,
+                detailUrl = detailUrl
             )
+            val existing = eventsById[id]
+            eventsById[id] = if (existing == null) event else mergeLessonEvents(existing, event)
         }
-        return events.sortedWith(compareBy<LessonEvent> { it.dateIso }.thenBy { it.periodNumber })
+        return eventsById.values.sortedWith(compareBy<LessonEvent> { it.dateIso }.thenBy { it.periodNumber })
     }
 
     fun extractDialogUrl(rawJsUrl: String): String? {
