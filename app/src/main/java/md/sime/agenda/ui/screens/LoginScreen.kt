@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import md.sime.agenda.data.SavedCredentials
 import md.sime.agenda.model.UserType
-import md.sime.agenda.ui.components.SegmentedGlassToggle
 import md.sime.agenda.ui.components.SimeCard
 import md.sime.agenda.ui.theme.SimeTheme
 
@@ -67,7 +66,7 @@ fun LoginScreen(
     val colors = SimeTheme.colors
     var username by rememberSaveable { mutableStateOf(savedCredentials?.username.orEmpty()) }
     var password by rememberSaveable { mutableStateOf("") }
-    var userType by rememberSaveable { mutableStateOf(savedCredentials?.userType ?: UserType.ELEV) }
+    val userType = UserType.ELEV
     var stayLoggedIn by rememberSaveable { mutableStateOf(true) }
     var passwordVisible by remember { mutableStateOf(false) }
 
@@ -123,7 +122,7 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "${savedCredentials.username}  ·  ${savedCredentials.userType.labelRo}",
+                        text = "${savedCredentials.username}  ·  Elev",
                         color = colors.textPrimary,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
@@ -175,15 +174,6 @@ fun LoginScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-
-                // User Type Segmented Switcher
-                SegmentedGlassToggle(
-                    options = listOf("Elev", "Părinte"),
-                    selectedIndex = if (userType == UserType.ELEV) 0 else 1,
-                    onSelect = { userType = if (it == 0) UserType.ELEV else UserType.PARINTE }
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
 
                 val fieldColors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = colors.textPrimary,

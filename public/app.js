@@ -562,7 +562,7 @@
         ${saved ? `
           <div id="savedCardBox" class="glass-card highlighted" style="padding:16px;margin-bottom:16px;">
             <div class="kicker">CONT SALVAT LOCAL</div>
-            <div style="font-size:16px;font-weight:600;margin:5px 0 14px;">${esc(saved.username)} · ${saved.userType === 1 ? "Părinte" : "Elev"}</div>
+            <div style="font-size:16px;font-weight:600;margin:5px 0 14px;">${esc(saved.username)} · Elev</div>
             <button id="btnOneTap" class="btn-primary" ${state.loginLoading ? "disabled" : ""}>
               ${state.loginLoading ? "Se conectează..." : "Intră cu o singură apăsare"}
             </button>
@@ -571,10 +571,6 @@
 
         <form id="loginForm" class="glass-card" style="padding:16px;display:flex;flex-direction:column;gap:14px;">
           <div class="kicker">${saved ? "SAU ALT CONT" : "AUTENTIFICARE"}</div>
-          <div class="seg-trough">
-            <button type="button" class="seg-btn ${state.loginUserType === 2 ? "active" : ""}" data-ut="2">Elev</button>
-            <button type="button" class="seg-btn ${state.loginUserType === 1 ? "active" : ""}" data-ut="1">Părinte</button>
-          </div>
 
           <div class="input-group">
             <label class="kicker" for="inpUser">Nume utilizator</label>
@@ -1203,7 +1199,6 @@
   function renderDossierModal() {
     if (!state.showDossier) return "";
     const p = state.snapshot?.profile || {};
-    const opts = state.snapshot?.studentOptions || [];
     const teachers = (state.snapshot?.teachers || []).filter((t) => {
       const q = state.teacherQuery.trim().toLowerCase();
       return !q || t.subject.toLowerCase().includes(q) || t.teacherName.toLowerCase().includes(q);
@@ -1243,15 +1238,6 @@
             </div>
             <button id="closeDossier" class="icon-btn" style="font-size:18px;">✕</button>
           </div>
-
-          ${opts.length > 1 ? `
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              <div class="kicker">SCHIMBĂ ELEVUL</div>
-              ${opts.map((o) => `
-                <button class="seg-btn ${o.isSelected ? "active" : ""}" style="border:0.75px solid var(--border);" data-switch-student="${esc(o.switchUrl)}">${esc(o.name)}</button>
-              `).join("")}
-            </div>
-          ` : ""}
 
           <div class="glass-card" style="padding:12px;background:var(--bg);">
             ${row("Clasa", p.className)}
@@ -1424,10 +1410,6 @@
   let loginMounted = false;
 
   function updateLoginDomInPlace() {
-    document.querySelectorAll("[data-ut]").forEach((btn) => {
-      const ut = Number(btn.getAttribute("data-ut"));
-      btn.classList.toggle("active", ut === state.loginUserType);
-    });
     const inpPass = document.getElementById("inpPass");
     if (inpPass) {
       const nextType = state.loginShowPassword ? "text" : "password";
@@ -1635,13 +1617,7 @@
         return;
       }
       if (target.closest("#btnOneTap") && state.creds) {
-        handleLoginSubmit(state.creds.username, state.creds.password, state.creds.userType, true);
-        return;
-      }
-      const utBtn = target.closest("[data-ut]");
-      if (utBtn) {
-        state.loginUserType = Number(utBtn.getAttribute("data-ut"));
-        render({ part: "all" });
+        handleLoginSubmit(state.creds.username, state.creds.password, 2, true);
         return;
       }
 
