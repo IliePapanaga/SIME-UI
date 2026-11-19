@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import md.sime.agenda.model.GradeCalculator
 import md.sime.agenda.model.LessonEvent
 import md.sime.agenda.ui.LessonDetailSheetState
+import md.sime.agenda.ui.components.EvaluationBadge
 import md.sime.agenda.ui.components.HairlineDivider
 import md.sime.agenda.ui.components.SimeCard
 import md.sime.agenda.ui.components.StatusDot
@@ -209,11 +210,11 @@ fun ScheduleScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
-                        modifier = Modifier.height(5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.height(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (hasMark) StatusDot(colors.textSecondary)
+                        if (hasMark) StatusDot(colors.gradeLowMid)
                         if (hasAbsence) StatusDot(colors.absenceUnmotivated)
                     }
                 }
@@ -500,38 +501,17 @@ private fun WeekDayLessonRow(
         // Right evaluation / absence figure
         if (!lesson.badgeText.isNullOrBlank()) {
             Spacer(modifier = Modifier.width(10.dp))
-            if (lesson.isAbsent) {
-                Text(
-                    text = "ABS",
-                    color = colors.absenceUnmotivated,
-                    fontSize = 10.sp,
-                    letterSpacing = 0.8.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            } else if (lesson.numericGrade != null) {
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "NOTA",
-                        color = colors.textMuted,
-                        fontSize = 8.sp,
-                        letterSpacing = 0.9.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = lesson.badgeText,
-                        color = colors.textPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            } else {
-                Text(
-                    text = lesson.badgeText,
-                    color = colors.textPrimary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+            val isQual = lesson.numericGrade == null &&
+                !lesson.isAbsent &&
+                GradeCalculator.canonicalQualifier(lesson.badgeText) != null
+            val isDesc = lesson.numericGrade == null && !lesson.isAbsent && !isQual
+            EvaluationBadge(
+                text = if (lesson.isAbsent) "ABS" else lesson.badgeText,
+                isAbsent = lesson.isAbsent,
+                numericGrade = lesson.numericGrade,
+                isQualifier = isQual,
+                isDescriptor = isDesc
+            )
         }
     }
 }

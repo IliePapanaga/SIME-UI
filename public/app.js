@@ -6,6 +6,7 @@
   const STORAGE_TOKEN = "agenda_token_v1";
   const STORAGE_THEME = "agenda_theme_v2";
   const STORAGE_HW_DONE = "agenda_hw_done_v1";
+  const STORAGE_SCHED_LAYOUT = "agenda_sched_layout_v1";
 
   const QUALIFIER_KEYWORDS = [
     "educatie fizica",
@@ -87,9 +88,31 @@
     loginUsername: "",
     loginPassword: "",
     loginShowPassword: false,
-    pendingScrollCenter: false
+    pendingScrollCenter: false,
+    scheduleLayout: localStorage.getItem(STORAGE_SCHED_LAYOUT) || "grid"
   };
   if (state.creds?.username) state.loginUsername = state.creds.username;
+
+  let eventsByDate = new Map();
+  let eventsById = new Map();
+
+  function rebuildSnapshotIndex(snap) {
+    eventsByDate = new Map();
+    eventsById = new Map();
+    const list = snap?.scheduleEvents || [];
+    for (let i = 0; i < list.length; i++) {
+      const ev = list[i];
+      if (ev.id) eventsById.set(ev.id, ev);
+      if (!eventsByDate.has(ev.dateIso)) eventsByDate.set(ev.dateIso, []);
+      eventsByDate.get(ev.dateIso).push(ev);
+    }
+  }
+
+  function getLessonsForDate(dateIso) {
+    return eventsByDate.get(dateIso) || [];
+  }
+
+  if (state.snapshot) rebuildSnapshotIndex(state.snapshot);
 
   function resolveThemeMode(mode) {
     if (mode === "system" || !mode) {
@@ -231,6 +254,41 @@
     return ["Insuficient", "Suficient", "Bine", "Foarte bine"][avg - 1];
   }
 
+  function getNumericTier(num) {
+    if (num == null || Number.isNaN(num)) return "";
+    if (num >= 9) return "high";
+    if (num >= 7) return "mid";
+    return "low";
+  }
+
+  function getMarkKeycapTier(dg) {
+    if (dg.numericValue != null) {
+      return `tier-${getNumericTier(Number(dg.numericValue))}`;
+    }
+    if (dg.rawText) return "tier-qual";
+    return "";
+  }
+
+  function renderEvalBadge(text, { isAbsent = false, numericGrade = null, isQualifier = false, isDescriptor = false, small = false } = {}) {
+    const sm = small ? " sm" : "";
+    if (isAbsent) {
+      return `<span class="eval-badge abs${sm}">ABS</span>`;
+    }
+    if (isDescriptor) {
+      return `<span class="eval-badge descriptor${sm}">${esc(text)}</span>`;
+    }
+    const rawStr = String(text ?? "").trim();
+    if (isQualifier || canonicalQualifier(rawStr) != null) {
+      return `<span class="eval-badge qualifier${sm}">${esc(rawStr)}</span>`;
+    }
+    const parsed = numericGrade != null ? Number(numericGrade) : (/^\d+([.,]\d+)?$/.test(rawStr) ? parseFloat(rawStr.replace(",", ".")) : null);
+    if (parsed != null && !Number.isNaN(parsed)) {
+      const tier = getNumericTier(parsed);
+      return `<span class="eval-badge grade-${tier}${sm}">${esc(rawStr)}</span>`;
+    }
+    return `<span class="eval-badge descriptor${sm}">${esc(rawStr)}</span>`;
+  }
+
   function getEnrichedSemesterSubjects(sem) {
     const raw = (sem === 1 ? state.snapshot?.sem1Grades : state.snapshot?.sem2Grades) || [];
     return raw.map((sub) => {
@@ -295,6 +353,7 @@
       });
       state.snapshot = data.snapshot;
       state.sessionToken = data.sessionToken;
+      rebuildSnapshotIndex(data.snapshot);
       saveJson(STORAGE_SNAPSHOT, data.snapshot);
       saveJson(STORAGE_TOKEN, data.sessionToken);
     } catch (err) {
@@ -303,19 +362,19 @@
       }
     } finally {
       state.isSyncing = false;
-      render();
+      render({ part: "all" });
     }
   }
 
   async function handleLoginSubmit(username, password, userType, stayLoggedIn) {
     if (!username.trim() || !password) {
       state.loginError = "Introdu numele de utilizator și parola.";
-      render();
+      render({ part: "all" });
       return;
     }
     state.loginLoading = true;
     state.loginError = null;
-    render();
+    render({ part: "all" });
     try {
       const data = await apiCall({
         action: "sync",
@@ -332,6 +391,7 @@
       }
       state.sessionToken = data.sessionToken;
       state.snapshot = data.snapshot;
+      rebuildSnapshotIndex(data.snapshot);
       state.simMarks = {};
       state.simQualifiers = {};
       state.loginPassword = "";
@@ -342,14 +402,14 @@
       state.loginError = err.message || "Autentificare eșuată.";
     } finally {
       state.loginLoading = false;
-      render();
+      render({ part: "all" });
     }
   }
 
   async function openLessonDetail(lesson) {
     if (!lesson.detailUrl) return;
     state.lessonDetail = { lesson, loading: true, detail: null, error: null };
-    render();
+    render({ part: "modals" });
     try {
       const data = await apiCall({
         action: "lessonDetail",
@@ -370,13 +430,13 @@
     } catch (err) {
       state.lessonDetail = { lesson, loading: false, detail: null, error: err.message };
     }
-    render();
+    render({ part: "modals" });
   }
 
   async function switchStudent(switchUrl) {
     state.showDossier = false;
     state.isSyncing = true;
-    render();
+    render({ part: "all" });
     try {
       const data = await apiCall({
         action: "switchStudent",
@@ -388,6 +448,7 @@
       });
       state.snapshot = data.snapshot;
       state.sessionToken = data.sessionToken;
+      rebuildSnapshotIndex(data.snapshot);
       state.simMarks = {};
       state.simQualifiers = {};
       saveJson(STORAGE_SNAPSHOT, data.snapshot);
@@ -396,7 +457,7 @@
       state.syncError = err.message;
     } finally {
       state.isSyncing = false;
-      render();
+      render({ part: "all" });
     }
   }
 
@@ -405,11 +466,11 @@
     state.highlightedSubject = subjectToHighlight;
     state.tab = "schedule";
     state.pendingScrollCenter = true;
-    render();
-    if (openDetail && subjectToHighlight && state.snapshot?.scheduleEvents) {
+    render({ part: "tab" });
+    if (openDetail && subjectToHighlight) {
       const norm = normalizeSubject(subjectToHighlight);
-      const candidates = state.snapshot.scheduleEvents.filter(
-        (e) => e.dateIso === dateIso && normalizeSubject(e.subject) === norm
+      const candidates = getLessonsForDate(dateIso).filter(
+        (e) => normalizeSubject(e.subject) === norm
       );
       const best = candidates.find((e) => e.numericGrade != null) || candidates[0];
       if (best) openLessonDetail(best);
@@ -506,7 +567,7 @@
     const s = state.snapshot;
     const events = s.scheduleEvents || [];
     const today = todayIsoLocal();
-    const todayLessons = events.filter((e) => e.dateIso === today);
+    const todayLessons = getLessonsForDate(today);
 
     let previewDate = today;
     let previewTitle = "Astăzi la școală";
@@ -518,13 +579,13 @@
         previewDate = next.dateIso;
         const d = new Date(`${next.dateIso}T12:00:00`);
         previewTitle = `Următoarea zi (${RO_DAYS_FULL[d.getDay()]}, ${formatIsoShort(next.dateIso)})`;
-        previewLessons = events.filter((e) => e.dateIso === next.dateIso);
+        previewLessons = getLessonsForDate(next.dateIso);
       } else {
         const prev = [...events].reverse().find((e) => e.dateIso <= today);
         if (prev) {
           previewDate = prev.dateIso;
           previewTitle = `Ultima zi cu ore (${formatIsoShort(prev.dateIso)})`;
-          previewLessons = events.filter((e) => e.dateIso === prev.dateIso);
+          previewLessons = getLessonsForDate(prev.dateIso);
         } else {
           previewTitle = "Orarul zilei";
         }
@@ -540,9 +601,13 @@
       : `<div class="glass-card">${previewLessons.map((l) => {
           const meta = [l.room ? `Cab. ${l.room}` : "", l.teacher].filter(Boolean).join(" · ");
           const right = l.badgeText
-            ? l.isAbsent
-              ? `<span class="rose" style="font-size:11px;font-weight:600;letter-spacing:0.8px;">ABS</span>`
-              : `<span style="font-size:17px;font-weight:600;">${esc(l.badgeText)}</span>`
+            ? renderEvalBadge(l.badgeText, {
+                isAbsent: l.isAbsent,
+                numericGrade: l.numericGrade,
+                isQualifier: l.numericGrade == null && !l.isAbsent && canonicalQualifier(l.badgeText) != null,
+                isDescriptor: l.numericGrade == null && !l.isAbsent && canonicalQualifier(l.badgeText) == null,
+                small: true
+              })
             : "";
           return `
             <div class="ledger-row" data-open-lesson="${esc(l.id)}">
@@ -581,11 +646,20 @@
       ? `<div class="glass-card" style="padding:14px;font-size:13px;"><span class="secondary">Nu există note recente.</span></div>`
       : `<div class="glass-card">${evals.map((ev) => {
           const dIso = parseDisplayDateToIso(ev.date);
+          const rawGrade = String(ev.grade || "").trim();
+          const isNum = /^\d+([.,]\d+)?$/.test(rawGrade);
+          const numVal = isNum ? parseFloat(rawGrade.replace(",", ".")) : null;
+          const isQual = canonicalQualifier(rawGrade) != null;
+          const badge = renderEvalBadge(rawGrade, {
+            numericGrade: numVal,
+            isQualifier: isQual,
+            isDescriptor: !isNum && !isQual
+          });
           return `
             <div class="ledger-row" ${dIso ? `data-jump="${esc(dIso)}|${esc(ev.subject)}|1"` : ""}>
               <span class="muted" style="width:46px;font-size:12px;">${esc(formatDisplayShort(ev.date))}</span>
               <span style="flex:1;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(ev.subject)}</span>
-              <span style="font-size:17px;font-weight:600;">${esc(ev.grade)}</span>
+              ${badge}
               ${dIso ? `<span class="muted" style="font-size:15px;">›</span>` : ""}
             </div>
           `;
@@ -644,44 +718,49 @@
   }
 
   function renderSchedule() {
-    const events = state.snapshot?.scheduleEvents || [];
     const todayIso = todayIsoLocal();
     const selIso = state.selectedDateIso || todayIso;
     const mondayIso = getMondayIso(selIso);
     const satIso = addDaysIso(mondayIso, 5);
-    const hasSaturday = events.some((e) => e.dateIso === satIso);
+    const hasSaturday = getLessonsForDate(satIso).length > 0;
     const numDays = hasSaturday ? 6 : 5;
     const weekDays = Array.from({ length: numDays }, (_, i) => addDaysIso(mondayIso, i));
     const endRange = hasSaturday ? satIso : addDaysIso(mondayIso, 4);
     const weekRange = `${formatIsoShort(mondayIso)} – ${formatIsoShort(endRange)}`;
-    const weekHasAny = events.some((e) => e.dateIso >= weekDays[0] && e.dateIso <= weekDays[weekDays.length - 1]);
+    const dayLessonsMap = weekDays.map((dIso) => getLessonsForDate(dIso));
+    const weekHasAny = dayLessonsMap.some((list) => list.length > 0);
+    const isListMode = state.scheduleLayout === "list";
 
-    const dayStripHtml = weekDays.map((dIso) => {
+    const dayStripHtml = weekDays.map((dIso, idx) => {
       const d = new Date(`${dIso}T12:00:00`);
       const active = dIso === selIso;
-      const evs = events.filter((e) => e.dateIso === dIso);
-      const hasMark = evs.some((e) => e.numericGrade != null);
+      const evs = dayLessonsMap[idx];
+      const hasMark = evs.some((e) => e.numericGrade != null || (e.badgeText && !e.isAbsent));
       const hasAbs = evs.some((e) => e.isAbsent);
       return `
         <button class="day-pill ${active ? "active" : ""}" data-select-date="${esc(dIso)}">
           <span class="kicker" style="color:${active ? "var(--text-primary)" : "var(--text-muted)"};">${RO_DAYS_SHORT[d.getDay()]}</span>
           <span style="margin-top:2px;font-size:15px;font-weight:600;color:${active ? "var(--text-primary)" : "var(--text-secondary)"};">${d.getDate()}</span>
           <span class="dot-row">
-            ${hasMark ? `<span class="dot" style="background:var(--text-secondary);"></span>` : ""}
-            ${hasAbs ? `<span class="dot" style="background:var(--rose);"></span>` : ""}
+            ${hasMark ? `<span class="dot" style="width:5px;height:5px;border-radius:3px;background:var(--bronze);"></span>` : ""}
+            ${hasAbs ? `<span class="dot" style="width:5px;height:5px;border-radius:3px;background:var(--badge-abs-text);"></span>` : ""}
           </span>
         </button>
       `;
     }).join("");
 
+    const boardClass = isListMode
+      ? "week-board list-mode"
+      : `week-board compact-cols cols-${numDays}`;
+
     const weekCardsHtml = !weekHasAny
       ? `<div class="glass-card" style="padding:28px 16px;text-align:center;"><span class="secondary" style="font-size:14px;">Nu există lecții înregistrate pentru săptămâna ${esc(weekRange)}.</span></div>`
-      : `<div style="display:flex;flex-direction:column;gap:14px;">
-          ${weekDays.map((dIso) => {
+      : `<div class="${boardClass}">
+          ${weekDays.map((dIso, idx) => {
             const d = new Date(`${dIso}T12:00:00`);
             const isSel = dIso === selIso;
             const isToday = dIso === todayIso;
-            const lessons = events.filter((e) => e.dateIso === dIso);
+            const lessons = dayLessonsMap[idx];
             const countLabel = lessons.length === 1 ? "1 oră" : `${lessons.length} ore`;
             const normHi = state.highlightedSubject ? normalizeSubject(state.highlightedSubject) : null;
 
@@ -690,16 +769,15 @@
               : lessons.map((l) => {
                   const rowHi = isSel && normHi && normalizeSubject(l.subject) === normHi;
                   const meta = [l.teacher, l.room ? `Cab. ${l.room}` : ""].filter(Boolean).join(" · ");
-                  let rightHtml = "";
-                  if (l.badgeText) {
-                    if (l.isAbsent) {
-                      rightHtml = `<span class="rose" style="font-size:10px;font-weight:600;letter-spacing:0.8px;">ABS</span>`;
-                    } else if (l.numericGrade != null) {
-                      rightHtml = `<div style="text-align:right;"><div class="kicker" style="font-size:8px;">NOTA</div><div style="font-size:16px;font-weight:600;">${esc(l.badgeText)}</div></div>`;
-                    } else {
-                      rightHtml = `<span style="font-size:12px;font-weight:600;">${esc(l.badgeText)}</span>`;
-                    }
-                  }
+                  const rightHtml = l.badgeText
+                    ? renderEvalBadge(l.badgeText, {
+                        isAbsent: l.isAbsent,
+                        numericGrade: l.numericGrade,
+                        isQualifier: l.numericGrade == null && !l.isAbsent && canonicalQualifier(l.badgeText) != null,
+                        isDescriptor: l.numericGrade == null && !l.isAbsent && canonicalQualifier(l.badgeText) == null,
+                        small: true
+                      })
+                    : "";
                   return `
                     <div class="ledger-row ${rowHi ? "lesson-highlight" : ""}" style="align-items:flex-start;" data-open-lesson="${esc(l.id)}">
                       <div class="lesson-time-col">
@@ -709,9 +787,9 @@
                       </div>
                       <div class="v-hairline"></div>
                       <div style="flex:1;min-width:0;">
-                        <div style="font-size:14px;font-weight:600;">${esc(l.subject)}</div>
+                        <div style="font-size:13.5px;font-weight:600;line-height:1.25;">${esc(l.subject)}</div>
                         ${meta ? `<div class="secondary" style="font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(meta)}</div>` : ""}
-                        ${l.homeworkSnippet ? `<div class="muted" style="font-size:11px;line-height:1.35;margin-top:4px;">Temă: ${esc(l.homeworkSnippet)}</div>` : ""}
+                        ${l.homeworkSnippet ? `<div class="muted" style="font-size:11px;line-height:1.35;margin-top:4px;overflow-wrap:anywhere;">Temă: ${esc(l.homeworkSnippet)}</div>` : ""}
                       </div>
                       ${rightHtml}
                     </div>
@@ -719,15 +797,15 @@
                 }).join("");
 
             return `
-              <div class="glass-card ${isSel ? "highlighted" : ""}" id="day-card-${esc(dIso)}">
+              <div class="glass-card ${isSel || isToday ? "highlighted" : ""}" id="day-card-${esc(dIso)}">
                 <div class="week-day-head" data-select-date="${esc(dIso)}">
-                  <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="font-size:12px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:${isSel ? "var(--text-primary)" : "var(--text-secondary)"};">
+                  <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                    <span class="week-day-title" style="font-size:11.5px;font-weight:600;letter-spacing:0.9px;text-transform:uppercase;color:${isSel || isToday ? "var(--text-primary)" : "var(--text-secondary)"};">
                       ${RO_DAYS_FULL[d.getDay()].toUpperCase()} · ${formatIsoShort(dIso)}
                     </span>
                     ${isToday ? `<span class="badge-azi">AZI</span>` : ""}
                   </div>
-                  <span class="muted" style="font-size:11px;">${countLabel}</span>
+                  <span class="muted" style="font-size:11px;flex-shrink:0;">${countLabel}</span>
                 </div>
                 ${rowsHtml}
               </div>
@@ -741,6 +819,10 @@
         <div class="week-center">
           <span style="font-size:14px;font-weight:600;">${esc(weekRange)}</span>
           ${selIso !== todayIso ? `<button class="azi-pill" data-select-date="${esc(todayIso)}">Azi</button>` : ""}
+          <div class="schedule-layout-toggle" role="group" aria-label="Mod afișare orar">
+            <button class="schedule-layout-btn ${!isListMode ? "active" : ""}" data-sched-layout="grid">Grilă</button>
+            <button class="schedule-layout-btn ${isListMode ? "active" : ""}" data-sched-layout="list">Listă</button>
+          </div>
         </div>
         <button class="icon-btn" data-select-date="${esc(addDaysIso(selIso, 7))}" title="Săptămâna următoare">${ICONS.right}</button>
       </div>
@@ -765,12 +847,15 @@
 
           let rightHeader = "";
           if (evalType === "QUALIFIER") {
-            rightHeader = `<span class="${hasSimSub ? "bronze" : ""}" style="font-size:15px;font-weight:600;">${esc(qualSummary || "—")}</span>`;
+            rightHeader = qualSummary
+              ? renderEvalBadge(qualSummary, { isQualifier: true })
+              : `<span class="muted" style="font-size:15px;font-weight:600;">—</span>`;
           } else if (evalType === "DESCRIPTOR_ONLY") {
-            rightHeader = `<span class="muted" style="font-size:12px;font-weight:500;">Descriptori</span>`;
+            rightHeader = renderEvalBadge("Descriptori", { isDescriptor: true });
+          } else if (sub.liveAverage != null) {
+            rightHeader = renderEvalBadge(sub.liveAverage.toFixed(2), { numericGrade: sub.liveAverage });
           } else {
-            const avgTxt = sub.liveAverage != null ? sub.liveAverage.toFixed(2) : "—";
-            rightHeader = `<span class="${hasSimSub ? "bronze" : ""}" style="font-size:19px;font-weight:600;">${esc(avgTxt)}</span>`;
+            rightHeader = `<span class="muted" style="font-size:18px;font-weight:600;">—</span>`;
           }
 
           const meta = [
@@ -783,22 +868,23 @@
             bodyHtml = `<div class="hairline" style="margin:10px 0;"></div><div class="chips-flow">${sub.datedGrades.map((dg) => {
               const clickable = dg.isSimulated || Boolean(dg.dateIso);
               const dLabel = dg.isSimulated ? "Sim." : (dg.dateDisplay ? formatDisplayShort(dg.dateDisplay) : "");
+              const tierCls = dg.isSimulated ? "simulated" : getMarkKeycapTier(dg);
               const attr = dg.isSimulated
                 ? `data-pop-sim="${esc(sub.subject)}|${dg.numericValue == null ? "q" : "n"}"`
                 : (dg.dateIso ? `data-jump="${esc(dg.dateIso)}|${esc(sub.subject)}|1"` : "");
               return `
-                <div class="mark-keycap ${clickable ? "clickable" : ""} ${dg.isSimulated ? "simulated" : ""}" ${attr}>
-                  <span style="font-size:${dg.rawText.length > 3 ? 13 : 15}px;font-weight:600;">${esc(dg.rawText)}</span>
-                  ${dLabel ? `<span class="${dg.isSimulated ? "bronze" : "muted"}" style="font-size:10px;font-weight:500;">${esc(dLabel)}</span>` : ""}
+                <div class="mark-keycap ${tierCls} ${clickable ? "clickable" : ""}" ${attr}>
+                  <span class="mark-val" style="${dg.rawText.length > 3 ? "font-size:13px;" : ""}">${esc(dg.rawText)}</span>
+                  ${dLabel ? `<span style="font-size:10px;font-weight:500;opacity:0.8;">${esc(dLabel)}</span>` : ""}
                 </div>
               `;
             }).join("")}</div>`;
+          } else if (evalType === "DESCRIPTOR_ONLY") {
+            bodyHtml = `<div class="descriptor-banner">Evaluare prin descriptori (fără note sau calificative)</div>`;
           } else {
-            const emptyTxt = evalType === "DESCRIPTOR_ONLY"
-              ? "Evaluare prin descriptori (fără note sau calificative)"
-              : evalType === "QUALIFIER"
-                ? "Niciun calificativ înregistrat"
-                : "Nicio notă înregistrată";
+            const emptyTxt = evalType === "QUALIFIER"
+              ? "Niciun calificativ înregistrat"
+              : "Nicio notă înregistrată";
             bodyHtml = `<div class="muted" style="margin-top:8px;font-size:12px;">${emptyTxt}</div>`;
           }
 
@@ -922,12 +1008,12 @@
               <div class="glass-card" style="padding:14px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;${dIso ? "cursor:pointer;" : ""}" ${dIso ? `data-jump="${esc(dIso)}||0"` : ""}>
                   <span style="font-size:14px;font-weight:600;">${esc(header)}</span>
-                  <span class="${g.unmotCount > 0 ? "rose" : "secondary"}" style="font-size:11px;font-weight:500;">${esc(summary)}</span>
+                  ${summary ? `<span class="eval-badge sm ${g.unmotCount > 0 ? "abs" : ""}">${esc(summary)}</span>` : ""}
                 </div>
                 <div class="chips-flow" style="margin-top:10px;gap:6px;">
                   ${g.items.map((a) => `
-                    <span class="abs-lesson-pill ${a.isMotivated ? "" : "unmotivated"}" ${dIso ? `data-jump="${esc(dIso)}|${esc(a.subject)}|0"` : ""}>
-                      <span class="dot" style="background:${a.isMotivated ? "var(--text-muted)" : "var(--rose)"};"></span>
+                    <span class="abs-lesson-pill ${a.isMotivated ? "motivated" : "unmotivated"}" ${dIso ? `data-jump="${esc(dIso)}|${esc(a.subject)}|0"` : ""}>
+                      <span class="dot" style="width:5px;height:5px;border-radius:3px;background:${a.isMotivated ? "var(--text-secondary)" : "var(--badge-abs-text)"};"></span>
                       Ora ${esc(a.periodNumber)} · ${esc(a.subject)}
                     </span>
                   `).join("")}
@@ -992,8 +1078,8 @@
                       : details.map((a) => {
                           const dIso = parseDisplayDateToIso(a.date);
                           return `
-                            <span class="abs-lesson-pill ${a.isMotivated ? "" : "unmotivated"}" ${dIso ? `data-jump="${esc(dIso)}|${esc(it.subject)}|0"` : ""}>
-                              <span class="dot" style="background:${a.isMotivated ? "var(--text-muted)" : "var(--rose)"};"></span>
+                            <span class="abs-lesson-pill ${a.isMotivated ? "motivated" : "unmotivated"}" ${dIso ? `data-jump="${esc(dIso)}|${esc(it.subject)}|0"` : ""}>
+                              <span class="dot" style="width:5px;height:5px;border-radius:3px;background:${a.isMotivated ? "var(--text-secondary)" : "var(--badge-abs-text)"};"></span>
                               ${esc(formatDisplayShort(a.date))} · Ora ${esc(a.periodNumber)}
                             </span>
                           `;
@@ -1146,13 +1232,8 @@
             <div style="display:flex;flex-direction:column;gap:8px;">
               <div class="kicker">DISCIPLINE ȘI PROFESORI</div>
               <input id="inpTeacherSearch" class="text-input" placeholder="Caută disciplină sau profesor" value="${esc(state.teacherQuery)}" />
-              <div class="glass-card" style="background:var(--bg);">
-                ${teachers.map((t) => `
-                  <div style="display:flex;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:0.5px solid var(--hairline);font-size:13px;">
-                    <span style="font-weight:500;">${esc(t.subject)}</span>
-                    <span class="secondary" style="text-align:right;">${esc(t.teacherName)}</span>
-                  </div>
-                `).join("")}
+              <div id="teacherList" class="glass-card" style="background:var(--bg);">
+                ${renderTeacherRows(state.teacherQuery)}
               </div>
             </div>
           ` : ""}
@@ -1162,6 +1243,22 @@
         </div>
       </div>
     `;
+  }
+
+  function renderTeacherRows(query) {
+    const q = String(query || "").trim().toLowerCase();
+    const teachers = (state.snapshot?.teachers || []).filter(
+      (t) => !q || t.subject.toLowerCase().includes(q) || t.teacherName.toLowerCase().includes(q)
+    );
+    if (teachers.length === 0) {
+      return `<div class="muted" style="padding:10px 12px;font-size:13px;">Niciun rezultat</div>`;
+    }
+    return teachers.map((t) => `
+      <div style="display:flex;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:0.5px solid var(--hairline);font-size:13px;">
+        <span style="font-weight:500;">${esc(t.subject)}</span>
+        <span class="secondary" style="text-align:right;">${esc(t.teacherName)}</span>
+      </div>
+    `).join("");
   }
 
   function renderLessonModal() {
@@ -1175,10 +1272,21 @@
       body = `<div class="rose" style="font-size:13px;">${esc(ld.error)}</div>`;
     } else if (ld.detail) {
       const d = ld.detail;
+      const evalStr = String(d.evaluation || "").trim();
+      const isAbsEval = evalStr.toLowerCase() === "a";
+      const isNumEval = /^\d+([.,]\d+)?$/.test(evalStr);
+      const evalBadge = evalStr
+        ? renderEvalBadge(isAbsEval ? "Evaluare: ABS" : `Evaluare: ${evalStr}`, {
+            isAbsent: isAbsEval,
+            numericGrade: isNumEval ? parseFloat(evalStr.replace(",", ".")) : null,
+            isQualifier: canonicalQualifier(evalStr) != null,
+            isDescriptor: !isAbsEval && !isNumEval && canonicalQualifier(evalStr) == null
+          })
+        : "";
       const tags = [
-        d.evaluation ? `<span class="mark-keycap" style="padding:4px 10px;font-size:12px;font-weight:600;${d.evaluation.toLowerCase() === "a" ? "color:var(--rose);" : ""}">Evaluare: ${esc(d.evaluation)}</span>` : "",
-        d.isSummative ? `<span class="mark-keycap secondary" style="padding:4px 10px;font-size:12px;">Sumativă</span>` : "",
-        d.isTeza ? `<span class="mark-keycap secondary" style="padding:4px 10px;font-size:12px;">Teză</span>` : ""
+        evalBadge,
+        d.isSummative ? `<span class="eval-badge qualifier sm">Sumativă</span>` : "",
+        d.isTeza ? `<span class="eval-badge descriptor sm">Teză</span>` : ""
       ].filter(Boolean).join("");
 
       body = `
@@ -1222,11 +1330,56 @@
     `;
   }
 
-  function render() {
+  let shellMounted = false;
+  let lastShellProfileKey = null;
+  let lastRenderedTab = null;
+
+  function updateChrome(p, curTab) {
+    const titleEl = document.getElementById("topbarTitle");
+    if (titleEl && curTab) titleEl.textContent = curTab.label;
+
+    document.querySelectorAll("[data-tab]").forEach((el) => {
+      el.classList.toggle("active", el.getAttribute("data-tab") === state.tab);
+    });
+
+    const syncSlot = document.getElementById("syncTopSlot");
+    if (syncSlot) {
+      const nextSync = state.isSyncing
+        ? `<span class="spinner" title="Se actualizează"></span>`
+        : `<button class="icon-btn" id="btnRefresh" title="Actualizează">${ICONS.refresh}</button>`;
+      if (syncSlot.getAttribute("data-busy") !== String(state.isSyncing)) {
+        syncSlot.setAttribute("data-busy", String(state.isSyncing));
+        syncSlot.innerHTML = nextSync;
+      }
+    }
+
+    const sideRefresh = document.getElementById("sidebarRefresh");
+    if (sideRefresh) {
+      sideRefresh.disabled = state.isSyncing;
+      sideRefresh.textContent = state.isSyncing ? "Se actualizează..." : "Actualizează acum";
+    }
+
+    const errSlot = document.getElementById("syncErrSlot");
+    if (errSlot) {
+      const errHtml = state.syncError
+        ? `<div class="sync-banner" id="dismissSyncErr"><span>${esc(state.syncError)}</span><span class="secondary" style="font-weight:600;">Închide</span></div>`
+        : "";
+      if (errSlot.getAttribute("data-err") !== String(state.syncError || "")) {
+        errSlot.setAttribute("data-err", String(state.syncError || ""));
+        errSlot.innerHTML = errHtml;
+      }
+    }
+  }
+
+  function render({ part = "all" } = {}) {
     const root = document.getElementById("app");
+    if (!root) return;
+
     if (!isLoggedIn()) {
+      shellMounted = false;
+      lastShellProfileKey = null;
+      lastRenderedTab = null;
       root.innerHTML = renderLogin();
-      bindEvents();
       return;
     }
 
@@ -1234,213 +1387,274 @@
     const classSuffix = p.className ? `AGENDA · ${p.className}` : "AGENDA";
     const curTab = TABS.find((t) => t.id === state.tab) || TABS[0];
     const dossierLabel = p.className ? `${p.initials || "AE"} · ${p.className}` : (p.initials || "AE");
+    const profileKey = `${p.fullName || ""}|${p.className || ""}|${p.shortName || ""}`;
 
-    let tabContent = "";
-    if (state.tab === "home") tabContent = renderHome();
-    else if (state.tab === "schedule") tabContent = renderSchedule();
-    else if (state.tab === "grades") tabContent = renderGrades();
-    else if (state.tab === "absences") tabContent = renderAbsences();
-    else if (state.tab === "messages") tabContent = renderMessages();
+    if (!shellMounted || lastShellProfileKey !== profileKey) {
+      root.innerHTML = `
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="sidebar-brand">
+              <div class="kicker">SIME · MOLDOVA</div>
+              <div style="font-size:20px;font-weight:600;margin-top:2px;">Agenda</div>
+              <div class="muted" style="font-size:12px;margin-top:2px;">${esc(p.shortName || p.fullName || "")}</div>
+            </div>
+            <nav class="sidebar-nav">
+              ${TABS.map((t) => `
+                <button class="sidebar-btn ${state.tab === t.id ? "active" : ""}" data-tab="${t.id}">
+                  ${t.icon}
+                  <span>${t.label}</span>
+                </button>
+              `).join("")}
+            </nav>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <button class="btn-outline" id="sidebarRefresh"></button>
+              <button class="btn-outline" id="sidebarDossier">Dosar & Setări</button>
+            </div>
+          </aside>
 
-    root.innerHTML = `
-      <div class="shell">
-        <aside class="sidebar">
-          <div class="sidebar-brand">
-            <div class="kicker">SIME · MOLDOVA</div>
-            <div style="font-size:20px;font-weight:600;margin-top:2px;">Agenda</div>
-            <div class="muted" style="font-size:12px;margin-top:2px;">${esc(p.shortName || p.fullName || "")}</div>
+          <div class="main-column">
+            <header class="topbar">
+              <div class="topbar-inner">
+                <div>
+                  <div class="kicker">${esc(classSuffix)}</div>
+                  <div class="topbar-title" id="topbarTitle">${esc(curTab.label)}</div>
+                </div>
+                <div class="topbar-actions">
+                  <span id="syncTopSlot" style="display:inline-flex;align-items:center;"></span>
+                  <button class="dossier-pill" id="btnDossier">${esc(dossierLabel)}</button>
+                </div>
+              </div>
+              <div id="syncErrSlot"></div>
+            </header>
+
+            <main class="content" id="tabContent"></main>
           </div>
-          <nav class="sidebar-nav">
+
+          <nav class="bottom-nav">
             ${TABS.map((t) => `
-              <button class="sidebar-btn ${state.tab === t.id ? "active" : ""}" data-tab="${t.id}">
+              <button class="nav-btn ${state.tab === t.id ? "active" : ""}" data-tab="${t.id}">
                 ${t.icon}
                 <span>${t.label}</span>
               </button>
             `).join("")}
           </nav>
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <button class="btn-outline" id="sidebarRefresh" ${state.isSyncing ? "disabled" : ""}>
-              ${state.isSyncing ? "Se actualizează..." : "Actualizează acum"}
-            </button>
-            <button class="btn-outline" id="sidebarDossier">Dosar & Setări</button>
-          </div>
-        </aside>
-
-        <div class="main-column">
-          <header class="topbar">
-            <div class="topbar-inner">
-              <div>
-                <div class="kicker">${esc(classSuffix)}</div>
-                <div class="topbar-title">${curTab.label}</div>
-              </div>
-              <div class="topbar-actions">
-                ${state.isSyncing
-                  ? `<span class="spinner" title="Se actualizează"></span>`
-                  : `<button class="icon-btn" id="btnRefresh" title="Actualizează">${ICONS.refresh}</button>`
-                }
-                <button class="dossier-pill" id="btnDossier">${esc(dossierLabel)}</button>
-              </div>
-            </div>
-            ${state.syncError ? `
-              <div class="sync-banner" id="dismissSyncErr">
-                <span>${esc(state.syncError)}</span>
-                <span class="secondary" style="font-weight:600;">Închide</span>
-              </div>
-            ` : ""}
-          </header>
-
-          <main class="content">${tabContent}</main>
         </div>
+        <div id="modalsRoot"></div>
+      `;
+      shellMounted = true;
+      lastShellProfileKey = profileKey;
+      part = "all";
+    }
 
-        <nav class="bottom-nav">
-          ${TABS.map((t) => `
-            <button class="nav-btn ${state.tab === t.id ? "active" : ""}" data-tab="${t.id}">
-              ${t.icon}
-              <span>${t.label}</span>
-            </button>
-          `).join("")}
-        </nav>
-      </div>
-      ${renderDossierModal()}
-      ${renderLessonModal()}
-    `;
+    updateChrome(p, curTab);
 
-    bindEvents();
+    const tabChanged = lastRenderedTab !== null && lastRenderedTab !== state.tab;
+
+    if (part === "all" || part === "tab") {
+      const container = document.getElementById("tabContent");
+      if (container) {
+        let html = "";
+        if (state.tab === "home") html = renderHome();
+        else if (state.tab === "schedule") html = renderSchedule();
+        else if (state.tab === "grades") html = renderGrades();
+        else if (state.tab === "absences") html = renderAbsences();
+        else if (state.tab === "messages") html = renderMessages();
+        container.innerHTML = html;
+      }
+      lastRenderedTab = state.tab;
+      if (tabChanged && typeof window !== "undefined" && window.scrollTo) {
+        window.scrollTo(0, 0);
+      }
+    }
+
+    if (part === "all" || part === "modals") {
+      const modalsRoot = document.getElementById("modalsRoot");
+      if (modalsRoot) {
+        modalsRoot.innerHTML = `${renderDossierModal()}${renderLessonModal()}`;
+      }
+    }
 
     if (state.tab === "schedule" && state.pendingScrollCenter) {
       state.pendingScrollCenter = false;
-      requestAnimationFrame(() => {
-        const card = document.getElementById(`day-card-${state.selectedDateIso}`);
-        if (card) {
-          card.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      });
+      const shouldCenter = (typeof window !== "undefined" && window.innerWidth < 1180) || state.scheduleLayout === "list";
+      if (shouldCenter && typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => {
+          const card = document.getElementById(`day-card-${state.selectedDateIso}`);
+          if (card) {
+            card.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        });
+      }
     }
   }
 
-  function bindEvents() {
-    // Login form
-    const loginForm = document.getElementById("loginForm");
-    if (loginForm) {
-      document.getElementById("inpUser")?.addEventListener("input", (e) => {
-        state.loginUsername = e.target.value;
-      });
-      document.getElementById("inpPass")?.addEventListener("input", (e) => {
-        state.loginPassword = e.target.value;
-      });
-      loginForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        handleLoginSubmit(state.loginUsername, state.loginPassword, state.loginUserType, document.getElementById("chkStay").checked);
-      });
-      document.querySelectorAll("[data-ut]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          state.loginUserType = Number(btn.getAttribute("data-ut"));
-          render();
-        });
-      });
-      const togglePass = document.getElementById("togglePass");
-      if (togglePass) {
-        togglePass.addEventListener("click", () => {
-          state.loginShowPassword = !state.loginShowPassword;
-          render();
-        });
-      }
-      const btnOneTap = document.getElementById("btnOneTap");
-      if (btnOneTap && state.creds) {
-        btnOneTap.addEventListener("click", () => {
-          handleLoginSubmit(state.creds.username, state.creds.password, state.creds.userType, true);
-        });
-      }
-      return;
-    }
+  function setupDelegatedEvents() {
+    const root = document.getElementById("app");
+    if (!root || root._agendaBound) return;
+    root._agendaBound = true;
 
-    document.querySelectorAll("[data-tab]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const target = el.getAttribute("data-tab");
-        state.tab = target;
-        if (target !== "schedule") state.highlightedSubject = null;
-        else state.pendingScrollCenter = true;
-        render();
-      });
+    root.addEventListener("input", (e) => {
+      const t = e.target;
+      if (!t) return;
+      if (t.id === "inpUser") {
+        state.loginUsername = t.value;
+      } else if (t.id === "inpPass") {
+        state.loginPassword = t.value;
+      } else if (t.id === "inpTeacherSearch") {
+        state.teacherQuery = t.value;
+        const listEl = document.getElementById("teacherList");
+        if (listEl) listEl.innerHTML = renderTeacherRows(state.teacherQuery);
+      }
     });
 
-    document.getElementById("btnRefresh")?.addEventListener("click", () => syncPortal({ silent: false }));
-    document.getElementById("sidebarRefresh")?.addEventListener("click", () => syncPortal({ silent: false }));
-    document.getElementById("btnDossier")?.addEventListener("click", () => { state.showDossier = true; render(); });
-    document.getElementById("sidebarDossier")?.addEventListener("click", () => { state.showDossier = true; render(); });
-    document.getElementById("dismissSyncErr")?.addEventListener("click", () => { state.syncError = null; render(); });
+    root.addEventListener("submit", (e) => {
+      if (e.target && e.target.id === "loginForm") {
+        e.preventDefault();
+        const chk = document.getElementById("chkStay");
+        handleLoginSubmit(state.loginUsername, state.loginPassword, state.loginUserType, chk ? chk.checked : true);
+      }
+    });
 
-    document.querySelectorAll("[data-select-date]").forEach((el) => {
-      el.addEventListener("click", () => {
-        state.selectedDateIso = el.getAttribute("data-select-date");
+    root.addEventListener("click", async (e) => {
+      const target = e.target;
+      if (!target) return;
+
+      if (target.id === "dossierBackdrop" || target.closest("#closeDossier")) {
+        state.showDossier = false;
+        render({ part: "modals" });
+        return;
+      }
+      if (target.id === "lessonBackdrop" || target.closest("#closeLesson")) {
+        state.lessonDetail = null;
+        render({ part: "modals" });
+        return;
+      }
+
+      // Login actions
+      if (target.closest("#togglePass")) {
+        state.loginShowPassword = !state.loginShowPassword;
+        render({ part: "all" });
+        return;
+      }
+      if (target.closest("#btnOneTap") && state.creds) {
+        handleLoginSubmit(state.creds.username, state.creds.password, state.creds.userType, true);
+        return;
+      }
+      const utBtn = target.closest("[data-ut]");
+      if (utBtn) {
+        state.loginUserType = Number(utBtn.getAttribute("data-ut"));
+        render({ part: "all" });
+        return;
+      }
+
+      // Navigation & Chrome
+      const tabBtn = target.closest("[data-tab]");
+      if (tabBtn) {
+        const nextTab = tabBtn.getAttribute("data-tab");
+        if (nextTab === state.tab && nextTab === "schedule") {
+          state.selectedDateIso = todayIsoLocal();
+          state.pendingScrollCenter = true;
+          render({ part: "tab" });
+          return;
+        }
+        state.tab = nextTab;
+        if (nextTab !== "schedule") state.highlightedSubject = null;
+        else state.pendingScrollCenter = true;
+        render({ part: "tab" });
+        return;
+      }
+      if (target.closest("#btnRefresh") || target.closest("#sidebarRefresh")) {
+        syncPortal({ silent: false });
+        return;
+      }
+      if (target.closest("#btnDossier") || target.closest("#sidebarDossier")) {
+        state.showDossier = true;
+        render({ part: "modals" });
+        return;
+      }
+      if (target.closest("#dismissSyncErr")) {
+        state.syncError = null;
+        render({ part: "chrome" });
+        return;
+      }
+
+      // Schedule layout & navigation
+      const layoutBtn = target.closest("[data-sched-layout]");
+      if (layoutBtn) {
+        state.scheduleLayout = layoutBtn.getAttribute("data-sched-layout");
+        try { localStorage.setItem(STORAGE_SCHED_LAYOUT, state.scheduleLayout); } catch {}
+        state.pendingScrollCenter = state.scheduleLayout === "list";
+        render({ part: "tab" });
+        return;
+      }
+      const dateBtn = target.closest("[data-select-date]");
+      if (dateBtn) {
+        state.selectedDateIso = dateBtn.getAttribute("data-select-date");
         state.highlightedSubject = null;
         state.pendingScrollCenter = true;
-        render();
-      });
-    });
-
-    document.querySelectorAll("[data-jump]").forEach((el) => {
-      el.addEventListener("click", (e) => {
+        render({ part: "tab" });
+        return;
+      }
+      const jumpBtn = target.closest("[data-jump]");
+      if (jumpBtn) {
         e.stopPropagation();
-        const [dIso, subj, openFlag] = el.getAttribute("data-jump").split("|");
+        const [dIso, subj, openFlag] = jumpBtn.getAttribute("data-jump").split("|");
         jumpToScheduleDate(dIso, subj || null, openFlag === "1");
-      });
-    });
-
-    document.querySelectorAll("[data-open-lesson]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const id = el.getAttribute("data-open-lesson");
-        const lesson = (state.snapshot?.scheduleEvents || []).find((e) => e.id === id);
+        return;
+      }
+      const lessonRow = target.closest("[data-open-lesson]");
+      if (lessonRow) {
+        const lesson = eventsById.get(lessonRow.getAttribute("data-open-lesson"));
         if (lesson) openLessonDetail(lesson);
-      });
-    });
-
-    document.querySelectorAll("[data-toggle-hw]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const id = el.getAttribute("data-toggle-hw");
+        return;
+      }
+      const hwRow = target.closest("[data-toggle-hw]");
+      if (hwRow) {
+        const id = hwRow.getAttribute("data-toggle-hw");
         if (state.hwDone.has(id)) state.hwDone.delete(id);
         else state.hwDone.add(id);
         saveJson(STORAGE_HW_DONE, [...state.hwDone]);
-        render();
-      });
-    });
+        render({ part: "tab" });
+        return;
+      }
 
-    // Grades controls
-    document.querySelectorAll("[data-sem]").forEach((el) => {
-      el.addEventListener("click", () => {
-        state.selectedSemester = Number(el.getAttribute("data-sem"));
-        render();
-      });
-    });
-    document.getElementById("toggleSimBtn")?.addEventListener("click", () => {
-      state.isSimulatorMode = !state.isSimulatorMode;
-      render();
-    });
-    document.querySelectorAll("[data-add-sim-n]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const [sub, val] = el.getAttribute("data-add-sim-n").split("|");
+      // Grades controls
+      const semBtn = target.closest("[data-sem]");
+      if (semBtn) {
+        state.selectedSemester = Number(semBtn.getAttribute("data-sem"));
+        render({ part: "tab" });
+        return;
+      }
+      if (target.closest("#toggleSimBtn")) {
+        state.isSimulatorMode = !state.isSimulatorMode;
+        render({ part: "tab" });
+        return;
+      }
+      const simNumBtn = target.closest("[data-add-sim-n]");
+      if (simNumBtn) {
+        const [sub, val] = simNumBtn.getAttribute("data-add-sim-n").split("|");
         state.simMarks[sub] = [...(state.simMarks[sub] || []), Number(val)];
-        render();
-      });
-    });
-    document.querySelectorAll("[data-add-sim-q]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const [sub, q] = el.getAttribute("data-add-sim-q").split("|");
+        render({ part: "tab" });
+        return;
+      }
+      const simQualBtn = target.closest("[data-add-sim-q]");
+      if (simQualBtn) {
+        const [sub, q] = simQualBtn.getAttribute("data-add-sim-q").split("|");
         state.simQualifiers[sub] = [...(state.simQualifiers[sub] || []), q];
-        render();
-      });
-    });
-    document.querySelectorAll("[data-pop-sim]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const [sub, kind] = el.getAttribute("data-pop-sim").split("|");
+        render({ part: "tab" });
+        return;
+      }
+      const popSimBtn = target.closest("[data-pop-sim]");
+      if (popSimBtn) {
+        const [sub, kind] = popSimBtn.getAttribute("data-pop-sim").split("|");
         if (kind === "q") state.simQualifiers[sub] = (state.simQualifiers[sub] || []).slice(0, -1);
         else state.simMarks[sub] = (state.simMarks[sub] || []).slice(0, -1);
-        render();
-      });
-    });
-    document.querySelectorAll("[data-reset-sim]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const sub = el.getAttribute("data-reset-sim");
+        render({ part: "tab" });
+        return;
+      }
+      const resetSimBtn = target.closest("[data-reset-sim]");
+      if (resetSimBtn) {
+        const sub = resetSimBtn.getAttribute("data-reset-sim");
         if (!sub) {
           state.simMarks = {};
           state.simQualifiers = {};
@@ -1448,92 +1662,81 @@
           delete state.simMarks[sub];
           delete state.simQualifiers[sub];
         }
-        render();
-      });
-    });
+        render({ part: "tab" });
+        return;
+      }
 
-    // Absences controls
-    document.querySelectorAll("[data-abs-filter]").forEach((el) => {
-      el.addEventListener("click", () => {
-        state.absFilter = el.getAttribute("data-abs-filter");
-        render();
-      });
-    });
-    document.querySelectorAll("[data-abs-view]").forEach((el) => {
-      el.addEventListener("click", () => {
-        state.absViewBySubject = el.getAttribute("data-abs-view") === "subjects";
-        render();
-      });
-    });
-    document.getElementById("cycleAbsSort")?.addEventListener("click", () => {
-      const order = ["newest", "oldest", "most"];
-      state.absSort = order[(order.indexOf(state.absSort) + 1) % order.length];
-      render();
-    });
-    document.querySelectorAll("[data-toggle-abs-sub]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const sub = el.getAttribute("data-toggle-abs-sub");
+      // Absences controls
+      const absFilterBtn = target.closest("[data-abs-filter]");
+      if (absFilterBtn) {
+        state.absFilter = absFilterBtn.getAttribute("data-abs-filter");
+        render({ part: "tab" });
+        return;
+      }
+      const absViewBtn = target.closest("[data-abs-view]");
+      if (absViewBtn) {
+        state.absViewBySubject = absViewBtn.getAttribute("data-abs-view") === "subjects";
+        render({ part: "tab" });
+        return;
+      }
+      if (target.closest("#cycleAbsSort")) {
+        const order = ["newest", "oldest", "most"];
+        state.absSort = order[(order.indexOf(state.absSort) + 1) % order.length];
+        render({ part: "tab" });
+        return;
+      }
+      const absSubCard = target.closest("[data-toggle-abs-sub]");
+      if (absSubCard) {
+        const sub = absSubCard.getAttribute("data-toggle-abs-sub");
         if (state.expandedSubjects.has(sub)) state.expandedSubjects.delete(sub);
         else state.expandedSubjects.add(sub);
-        render();
-      });
-    });
+        render({ part: "tab" });
+        return;
+      }
 
-    // Dossier Modal
-    document.getElementById("closeDossier")?.addEventListener("click", () => { state.showDossier = false; render(); });
-    document.getElementById("dossierBackdrop")?.addEventListener("click", (e) => {
-      if (e.target.id === "dossierBackdrop") { state.showDossier = false; render(); }
-    });
-    document.querySelectorAll("[data-theme]").forEach((el) => {
-      el.addEventListener("click", () => {
-        applyTheme(el.getAttribute("data-theme"));
-        render();
-      });
-    });
-    document.querySelectorAll("[data-switch-student]").forEach((el) => {
-      el.addEventListener("click", () => switchStudent(el.getAttribute("data-switch-student")));
-    });
-    document.getElementById("inpTeacherSearch")?.addEventListener("input", (e) => {
-      state.teacherQuery = e.target.value;
-      const pos = e.target.selectionStart;
-      render();
-      const inp = document.getElementById("inpTeacherSearch");
-      if (inp) { inp.focus(); inp.setSelectionRange(pos, pos); }
-    });
-    document.getElementById("btnPwaInstall")?.addEventListener("click", async () => {
-      if (!deferredInstallPrompt) return;
-      deferredInstallPrompt.prompt();
-      await deferredInstallPrompt.userChoice;
-      deferredInstallPrompt = null;
-      render();
-    });
-    document.getElementById("btnLogoutKeep")?.addEventListener("click", () => {
-      state.showDossier = false;
-      state.snapshot = null;
-      state.sessionToken = null;
-      saveJson(STORAGE_SNAPSHOT, null);
-      saveJson(STORAGE_TOKEN, null);
-      render();
-    });
-    document.getElementById("btnLogoutForget")?.addEventListener("click", () => {
-      state.showDossier = false;
-      state.snapshot = null;
-      state.sessionToken = null;
-      state.creds = null;
-      saveJson(STORAGE_SNAPSHOT, null);
-      saveJson(STORAGE_TOKEN, null);
-      saveJson(STORAGE_CREDS, null);
-      render();
-    });
-
-    // Lesson Detail Modal
-    document.getElementById("closeLesson")?.addEventListener("click", () => { state.lessonDetail = null; render(); });
-    document.getElementById("lessonBackdrop")?.addEventListener("click", (e) => {
-      if (e.target.id === "lessonBackdrop") { state.lessonDetail = null; render(); }
+      // Dossier modal actions
+      const themeBtn = target.closest("[data-theme]");
+      if (themeBtn) {
+        applyTheme(themeBtn.getAttribute("data-theme"));
+        render({ part: "modals" });
+        return;
+      }
+      const switchBtn = target.closest("[data-switch-student]");
+      if (switchBtn) {
+        switchStudent(switchBtn.getAttribute("data-switch-student"));
+        return;
+      }
+      if (target.closest("#btnPwaInstall") && deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        render({ part: "modals" });
+        return;
+      }
+      if (target.closest("#btnLogoutKeep")) {
+        state.showDossier = false;
+        state.snapshot = null;
+        state.sessionToken = null;
+        saveJson(STORAGE_SNAPSHOT, null);
+        saveJson(STORAGE_TOKEN, null);
+        render({ part: "all" });
+        return;
+      }
+      if (target.closest("#btnLogoutForget")) {
+        state.showDossier = false;
+        state.snapshot = null;
+        state.sessionToken = null;
+        state.creds = null;
+        saveJson(STORAGE_SNAPSHOT, null);
+        saveJson(STORAGE_TOKEN, null);
+        saveJson(STORAGE_CREDS, null);
+        render({ part: "all" });
+      }
     });
   }
 
-  render();
+  setupDelegatedEvents();
+  render({ part: "all" });
   if (isLoggedIn()) {
     syncPortal({ silent: true });
   }

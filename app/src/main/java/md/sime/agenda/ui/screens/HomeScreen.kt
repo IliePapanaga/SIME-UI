@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import md.sime.agenda.model.GradeCalculator
 import md.sime.agenda.model.LessonEvent
 import md.sime.agenda.model.PortalSnapshot
+import md.sime.agenda.ui.components.EvaluationBadge
 import md.sime.agenda.ui.components.HairlineDivider
 import md.sime.agenda.ui.components.SectionHeader
 import md.sime.agenda.ui.components.SimeCard
@@ -209,22 +210,17 @@ fun HomeScreen(
                                 }
                                 if (!lesson.badgeText.isNullOrBlank()) {
                                     Spacer(modifier = Modifier.width(10.dp))
-                                    if (lesson.isAbsent) {
-                                        Text(
-                                            text = "ABS",
-                                            color = colors.absenceUnmotivated,
-                                            fontSize = 11.sp,
-                                            letterSpacing = 0.8.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    } else {
-                                        Text(
-                                            text = lesson.badgeText,
-                                            color = colors.textPrimary,
-                                            fontSize = 17.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
+                                    val isQual = lesson.numericGrade == null &&
+                                        !lesson.isAbsent &&
+                                        GradeCalculator.canonicalQualifier(lesson.badgeText) != null
+                                    val isDesc = lesson.numericGrade == null && !lesson.isAbsent && !isQual
+                                    EvaluationBadge(
+                                        text = if (lesson.isAbsent) "ABS" else lesson.badgeText,
+                                        isAbsent = lesson.isAbsent,
+                                        numericGrade = lesson.numericGrade,
+                                        isQualifier = isQual,
+                                        isDescriptor = isDesc
+                                    )
                                 }
                             }
                             if (idx < previewLessons.lastIndex) {
@@ -358,11 +354,15 @@ fun HomeScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = eval.grade,
-                                    color = colors.textPrimary,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                val rawEval = eval.grade.trim()
+                                val evalNum = rawEval.replace(',', '.').toDoubleOrNull()?.toInt()
+                                val isQual = evalNum == null && GradeCalculator.canonicalQualifier(rawEval) != null
+                                val isDesc = evalNum == null && !isQual
+                                EvaluationBadge(
+                                    text = rawEval,
+                                    numericGrade = evalNum,
+                                    isQualifier = isQual,
+                                    isDescriptor = isDesc
                                 )
                                 if (dateIso != null) {
                                     Spacer(modifier = Modifier.width(8.dp))

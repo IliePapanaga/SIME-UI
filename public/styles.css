@@ -18,6 +18,24 @@ html[data-theme="amoled"] {
   --active-lens: rgba(255, 255, 255, 0.11);
   --hover-tint: rgba(255, 255, 255, 0.05);
   --shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+  --badge-high-bg: rgba(222, 188, 133, 0.18);
+  --badge-high-border: rgba(228, 195, 140, 0.58);
+  --badge-high-text: #f9e8c9;
+  --badge-mid-bg: rgba(226, 232, 240, 0.15);
+  --badge-mid-border: rgba(226, 232, 240, 0.45);
+  --badge-mid-text: #ffffff;
+  --badge-low-bg: rgba(217, 107, 107, 0.17);
+  --badge-low-border: rgba(240, 110, 110, 0.55);
+  --badge-low-text: #ffb4b4;
+  --badge-qual-bg: rgba(200, 169, 126, 0.20);
+  --badge-qual-border: rgba(200, 169, 126, 0.62);
+  --badge-qual-text: #f3d9b1;
+  --badge-desc-bg: rgba(165, 180, 252, 0.17);
+  --badge-desc-border: rgba(165, 180, 252, 0.50);
+  --badge-desc-text: #d4dcff;
+  --badge-abs-bg: rgba(229, 83, 83, 0.22);
+  --badge-abs-border: rgba(240, 110, 110, 0.72);
+  --badge-abs-text: #ff9494;
 }
 
 html[data-theme="dark"] {
@@ -39,6 +57,24 @@ html[data-theme="dark"] {
   --active-lens: rgba(255, 255, 255, 0.11);
   --hover-tint: rgba(255, 255, 255, 0.05);
   --shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  --badge-high-bg: rgba(222, 188, 133, 0.18);
+  --badge-high-border: rgba(228, 195, 140, 0.58);
+  --badge-high-text: #f9e8c9;
+  --badge-mid-bg: rgba(226, 232, 240, 0.15);
+  --badge-mid-border: rgba(226, 232, 240, 0.45);
+  --badge-mid-text: #ffffff;
+  --badge-low-bg: rgba(217, 107, 107, 0.17);
+  --badge-low-border: rgba(240, 110, 110, 0.55);
+  --badge-low-text: #ffb4b4;
+  --badge-qual-bg: rgba(200, 169, 126, 0.20);
+  --badge-qual-border: rgba(200, 169, 126, 0.62);
+  --badge-qual-text: #f3d9b1;
+  --badge-desc-bg: rgba(165, 180, 252, 0.17);
+  --badge-desc-border: rgba(165, 180, 252, 0.50);
+  --badge-desc-text: #d4dcff;
+  --badge-abs-bg: rgba(229, 83, 83, 0.22);
+  --badge-abs-border: rgba(240, 110, 110, 0.72);
+  --badge-abs-text: #ff9494;
 }
 
 html[data-theme="light"] {
@@ -60,6 +96,24 @@ html[data-theme="light"] {
   --active-lens: rgba(15, 17, 21, 0.07);
   --hover-tint: rgba(15, 17, 21, 0.03);
   --shadow: 0 8px 24px rgba(15, 17, 21, 0.07);
+  --badge-high-bg: rgba(166, 118, 46, 0.14);
+  --badge-high-border: rgba(154, 110, 50, 0.48);
+  --badge-high-text: #6e4711;
+  --badge-mid-bg: rgba(15, 23, 42, 0.09);
+  --badge-mid-border: rgba(15, 23, 42, 0.30);
+  --badge-mid-text: #0f172a;
+  --badge-low-bg: rgba(220, 38, 38, 0.11);
+  --badge-low-border: rgba(220, 38, 38, 0.44);
+  --badge-low-text: #991b1b;
+  --badge-qual-bg: rgba(154, 110, 50, 0.14);
+  --badge-qual-border: rgba(154, 110, 50, 0.52);
+  --badge-qual-text: #784f14;
+  --badge-desc-bg: rgba(79, 70, 229, 0.11);
+  --badge-desc-border: rgba(79, 70, 229, 0.42);
+  --badge-desc-text: #3730a3;
+  --badge-abs-bg: rgba(220, 38, 38, 0.13);
+  --badge-abs-border: rgba(220, 38, 38, 0.56);
+  --badge-abs-text: #b91c1c;
 }
 
 * {
@@ -98,8 +152,6 @@ button, input {
   background-image: var(--sheen);
   border: 0.75px solid var(--glass-border);
   border-radius: 14px;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
   overflow: hidden;
   flex-shrink: 0;
   transition: border-color 0.16s ease, background-color 0.16s ease;
@@ -153,9 +205,9 @@ button, input {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: rgba(10, 11, 14, 0.84);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(10, 11, 14, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   padding-top: env(safe-area-inset-top);
   border-bottom: 0.5px solid var(--hairline);
 }
@@ -248,9 +300,9 @@ html[data-theme="light"] .topbar {
   right: 0;
   bottom: 0;
   z-index: 35;
-  background: rgba(10, 11, 14, 0.88);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
+  background: rgba(10, 11, 14, 0.90);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-top: 0.5px solid var(--hairline);
   padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
   display: flex;
@@ -368,6 +420,13 @@ html[data-theme="light"] .bottom-nav {
 
   .content {
     padding: 20px 26px 36px;
+  }
+}
+
+@media (min-width: 1180px) {
+  .topbar-inner,
+  .content {
+    max-width: 1580px;
   }
 }
 
@@ -564,26 +623,125 @@ html[data-theme="light"] .bottom-nav {
   border-radius: 2px;
 }
 
+/* Full-Week Schedule Board */
+.week-board {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.week-board > * {
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .week-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+}
+
+.schedule-layout-toggle {
+  display: none;
+}
+
+.schedule-layout-btn {
+  padding: 4px 9px;
+  border-radius: 7px;
+  border: 0.75px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.schedule-layout-btn.active {
+  background: var(--active-lens);
+  border-color: var(--glass-border);
+  color: var(--text-primary);
+}
+
+@media (min-width: 1180px) {
+  .schedule-layout-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 9px;
+    background: var(--surface);
+    border: 0.75px solid var(--glass-border);
+  }
+
+  .week-board.cols-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .week-board.cols-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .week-board.compact-cols .week-day-head {
+    padding: 10px 10px;
+    gap: 6px;
+  }
+
+  .week-board.compact-cols .ledger-row {
+    padding: 9px 9px;
+    gap: 7px;
+  }
+
+  .week-board.compact-cols .lesson-time-col {
+    width: 40px;
+  }
+}
+
+@media (min-width: 1480px) {
+  .week-board.cols-6 {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+.week-board.list-mode {
+  grid-template-columns: 1fr;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+
 /* Week Day Card Rows */
 .week-day-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 11px 14px;
   border-bottom: 0.5px solid var(--hairline);
   cursor: pointer;
+}
+
+.week-day-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badge-azi {
   display: inline-block;
   padding: 2px 6px;
   border-radius: 5px;
-  background: var(--surface-elevated);
-  border: 0.75px solid rgba(200, 169, 126, 0.5);
-  color: var(--bronze);
+  background: var(--badge-qual-bg);
+  border: 0.75px solid var(--badge-qual-border);
+  color: var(--badge-qual-text);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.9px;
+  flex-shrink: 0;
 }
 
 .lesson-time-col {
@@ -600,7 +758,86 @@ html[data-theme="light"] .bottom-nav {
   background: var(--hairline);
 }
 
-/* Monochrome Grade Keycaps */
+/* High-Contrast Evaluation Badges (Grades, Qualifiers, Descriptors, Absences) */
+.eval-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.15;
+  flex-shrink: 0;
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eval-badge.sm {
+  padding: 3px 7px;
+  font-size: 11px;
+  border-radius: 7px;
+  max-width: 96px;
+}
+
+.eval-badge.grade-high {
+  background: var(--badge-high-bg);
+  border-color: var(--badge-high-border);
+  color: var(--badge-high-text);
+}
+
+.eval-badge.grade-mid {
+  background: var(--badge-mid-bg);
+  border-color: var(--badge-mid-border);
+  color: var(--badge-mid-text);
+}
+
+.eval-badge.grade-low {
+  background: var(--badge-low-bg);
+  border-color: var(--badge-low-border);
+  color: var(--badge-low-text);
+}
+
+.eval-badge.qualifier {
+  background: var(--badge-qual-bg);
+  border-color: var(--badge-qual-border);
+  color: var(--badge-qual-text);
+}
+
+.eval-badge.descriptor {
+  background: var(--badge-desc-bg);
+  border-color: var(--badge-desc-border);
+  color: var(--badge-desc-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.eval-badge.abs {
+  background: var(--badge-abs-bg);
+  border-color: var(--badge-abs-border);
+  color: var(--badge-abs-text);
+  font-size: 11px;
+  letter-spacing: 0.7px;
+}
+
+.descriptor-banner {
+  margin-top: 10px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  background: var(--badge-desc-bg);
+  border: 1px solid var(--badge-desc-border);
+  color: var(--badge-desc-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Prominent Grade Keycaps */
 .chips-flow {
   display: flex;
   flex-wrap: wrap;
@@ -611,11 +848,46 @@ html[data-theme="light"] .bottom-nav {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 6px 11px;
-  border-radius: 8px;
+  min-width: 44px;
+  padding: 7px 12px;
+  border-radius: 9px;
   background: var(--surface-elevated);
-  border: 0.75px solid var(--border);
+  border: 1px solid var(--border);
   cursor: default;
+}
+
+.mark-keycap .mark-val {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.mark-keycap.tier-high {
+  background: var(--badge-high-bg);
+  border-color: var(--badge-high-border);
+  color: var(--badge-high-text);
+}
+
+.mark-keycap.tier-mid {
+  background: var(--badge-mid-bg);
+  border-color: var(--badge-mid-border);
+  color: var(--badge-mid-text);
+}
+
+.mark-keycap.tier-low {
+  background: var(--badge-low-bg);
+  border-color: var(--badge-low-border);
+  color: var(--badge-low-text);
+}
+
+.mark-keycap.tier-qual {
+  background: var(--badge-qual-bg);
+  border-color: var(--badge-qual-border);
+  color: var(--badge-qual-text);
+}
+
+.mark-keycap.tier-qual .mark-val {
+  font-size: 13px;
 }
 
 .mark-keycap.clickable {
@@ -623,10 +895,12 @@ html[data-theme="light"] .bottom-nav {
 }
 
 .mark-keycap.clickable:hover {
+  filter: brightness(1.08);
   border-color: var(--glass-border-strong);
 }
 
 .mark-keycap.simulated {
+  border-style: dashed;
   border-color: var(--bronze);
   color: var(--bronze);
 }
@@ -662,8 +936,8 @@ html[data-theme="light"] .bottom-nav {
 .progress-track {
   display: flex;
   width: 100%;
-  height: 4px;
-  border-radius: 2px;
+  height: 5px;
+  border-radius: 3px;
   overflow: hidden;
   background: var(--surface-elevated);
 }
@@ -703,17 +977,24 @@ html[data-theme="light"] .abs-filter-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 9px;
+  padding: 6px 10px;
   border-radius: 8px;
   background: var(--surface-elevated);
-  border: 0.75px solid var(--border);
+  border: 1px solid var(--glass-border-strong);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .abs-lesson-pill.unmotivated {
-  border-color: rgba(217, 107, 107, 0.45);
+  background: var(--badge-abs-bg);
+  border-color: var(--badge-abs-border);
+  color: var(--badge-abs-text);
+}
+
+.abs-lesson-pill.motivated {
+  background: var(--surface-elevated);
+  border-color: var(--glass-border-strong);
 }
 
 .sort-cycle-btn {

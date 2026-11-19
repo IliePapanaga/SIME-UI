@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +39,7 @@ import md.sime.agenda.model.GradeCalculator
 import md.sime.agenda.model.PortalSnapshot
 import md.sime.agenda.model.SubjectEvaluationType
 import md.sime.agenda.model.SubjectGrades
+import md.sime.agenda.ui.components.EvaluationBadge
 import md.sime.agenda.ui.components.HairlineDivider
 import md.sime.agenda.ui.components.SegmentedGlassToggle
 import md.sime.agenda.ui.components.SimeCard
@@ -292,33 +294,48 @@ private fun SubjectGradesCard(
 
             when (evaluationType) {
                 SubjectEvaluationType.QUALIFIER -> {
-                    Text(
-                        text = qualifierSummary ?: "—",
-                        color = if (hasSimulated) colors.gradeLowMid else colors.textPrimary,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    if (!qualifierSummary.isNullOrBlank()) {
+                        EvaluationBadge(
+                            text = qualifierSummary,
+                            isQualifier = true,
+                            fontSize = 13.sp
+                        )
+                    } else {
+                        Text(
+                            text = "—",
+                            color = colors.textMuted,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
                 SubjectEvaluationType.DESCRIPTOR_ONLY -> {
-                    Text(
+                    EvaluationBadge(
                         text = "Descriptori",
-                        color = colors.textMuted,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                        isDescriptor = true,
+                        fontSize = 11.sp
                     )
                 }
                 SubjectEvaluationType.NUMERIC -> {
-                    Text(
-                        text = GradeCalculator.formatAverage(subject.liveAverage),
-                        color = if (hasSimulated) colors.gradeLowMid else colors.textPrimary,
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    if (subject.liveAverage != null) {
+                        EvaluationBadge(
+                            text = GradeCalculator.formatAverage(subject.liveAverage),
+                            fontSize = 16.sp,
+                            paddingValues = PaddingValues(horizontal = 11.dp, vertical = 5.dp)
+                        )
+                    } else {
+                        Text(
+                            text = "—",
+                            color = colors.textMuted,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         }
 
-        // Precision Monochrome Glass Keycaps
+        // Prominent Graded Glass Keycaps
         if (subject.datedGrades.isNotEmpty()) {
             Spacer(modifier = Modifier.height(10.dp))
             HairlineDivider()
@@ -329,8 +346,34 @@ private fun SubjectGradesCard(
             ) {
                 subject.datedGrades.forEach { dg ->
                     val isClickable = dg.isSimulated || !dg.dateIso.isNullOrBlank()
-                    val keycapBorder = if (dg.isSimulated) colors.gradeLowMid else colors.border
-                    val valueColor = if (dg.isSimulated) colors.gradeLowMid else colors.textPrimary
+                    val numVal = dg.numericValue
+                    val (keycapBg, keycapBorder, valueColor) = when {
+                        dg.isSimulated -> Triple(
+                            colors.surfaceElevated,
+                            colors.gradeLowMid,
+                            colors.gradeLowMid
+                        )
+                        numVal != null && numVal >= 9 -> Triple(
+                            if (colors.isDark) Color(0xFFDEBC85).copy(alpha = 0.18f) else Color(0xFFA6762E).copy(alpha = 0.14f),
+                            if (colors.isDark) Color(0xFFE4C38C).copy(alpha = 0.58f) else Color(0xFF9A6E32).copy(alpha = 0.48f),
+                            if (colors.isDark) Color(0xFFF9E8C9) else Color(0xFF6E4711)
+                        )
+                        numVal != null && numVal >= 7 -> Triple(
+                            if (colors.isDark) Color(0xFFE2E8F0).copy(alpha = 0.15f) else Color(0xFF0F172A).copy(alpha = 0.09f),
+                            if (colors.isDark) Color(0xFFE2E8F0).copy(alpha = 0.45f) else Color(0xFF0F172A).copy(alpha = 0.30f),
+                            if (colors.isDark) Color.White else Color(0xFF0F172A)
+                        )
+                        numVal != null -> Triple(
+                            colors.gradeLow.copy(alpha = if (colors.isDark) 0.17f else 0.11f),
+                            colors.gradeLow.copy(alpha = if (colors.isDark) 0.55f else 0.44f),
+                            if (colors.isDark) Color(0xFFFFB4B4) else Color(0xFF991B1B)
+                        )
+                        else -> Triple(
+                            colors.gradeLowMid.copy(alpha = if (colors.isDark) 0.20f else 0.14f),
+                            colors.gradeLowMid.copy(alpha = if (colors.isDark) 0.62f else 0.52f),
+                            if (colors.isDark) Color(0xFFF3D9B1) else Color(0xFF784F14)
+                        )
+                    }
                     val dateLabel = when {
                         dg.isSimulated -> "Sim."
                         !dg.dateDisplay.isNullOrBlank() -> GradeCalculator.formatDisplayToShort(dg.dateDisplay)
@@ -339,25 +382,25 @@ private fun SubjectGradesCard(
 
                     Column(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(colors.surfaceElevated, RoundedCornerShape(8.dp))
-                            .border(0.75.dp, keycapBorder, RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(keycapBg, RoundedCornerShape(9.dp))
+                            .border(1.dp, keycapBorder, RoundedCornerShape(9.dp))
                             .let {
                                 if (isClickable) it.clickable { onGradeClick(dg) } else it
                             }
-                            .padding(horizontal = 11.dp, vertical = 6.dp),
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             text = dg.rawText,
                             color = valueColor,
-                            fontSize = if (dg.rawText.length > 3) 13.sp else 15.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = if (dg.rawText.length > 3) 13.sp else 16.sp,
+                            fontWeight = FontWeight.Bold
                         )
                         if (!dateLabel.isNullOrBlank()) {
                             Text(
                                 text = dateLabel,
-                                color = if (dg.isSimulated) colors.gradeLowMid else colors.textMuted,
+                                color = valueColor.copy(alpha = 0.78f),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -365,12 +408,36 @@ private fun SubjectGradesCard(
                     }
                 }
             }
+        } else if (evaluationType == SubjectEvaluationType.DESCRIPTOR_ONLY) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(
+                        if (colors.isDark) Color(0xFFA5B4FC).copy(alpha = 0.17f) else Color(0xFF4F46E5).copy(alpha = 0.11f),
+                        RoundedCornerShape(9.dp)
+                    )
+                    .border(
+                        1.dp,
+                        if (colors.isDark) Color(0xFFA5B4FC).copy(alpha = 0.50f) else Color(0xFF4F46E5).copy(alpha = 0.42f),
+                        RoundedCornerShape(9.dp)
+                    )
+                    .padding(horizontal = 11.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Evaluare prin descriptori (fără note sau calificative)",
+                    color = if (colors.isDark) Color(0xFFD4DCFF) else Color(0xFF3730A3),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         } else {
             Spacer(modifier = Modifier.height(8.dp))
-            val emptyText = when (evaluationType) {
-                SubjectEvaluationType.DESCRIPTOR_ONLY -> "Evaluare prin descriptori (fără note sau calificative)"
-                SubjectEvaluationType.QUALIFIER -> "Niciun calificativ înregistrat"
-                SubjectEvaluationType.NUMERIC -> "Nicio notă înregistrată"
+            val emptyText = if (evaluationType == SubjectEvaluationType.QUALIFIER) {
+                "Niciun calificativ înregistrat"
+            } else {
+                "Nicio notă înregistrată"
             }
             Text(
                 text = emptyText,

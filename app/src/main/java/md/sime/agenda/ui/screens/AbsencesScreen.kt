@@ -1,5 +1,6 @@
 package md.sime.agenda.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -399,12 +401,34 @@ private fun DayAbsenceCard(
                 modifier = Modifier.weight(1f)
             )
             if (summaryParts.isNotEmpty()) {
-                Text(
-                    text = summaryParts,
-                    color = if (group.unmotivatedCount > 0) colors.absenceUnmotivated else colors.textSecondary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                Surface(
+                    shape = RoundedCornerShape(7.dp),
+                    color = if (group.unmotivatedCount > 0) {
+                        colors.absenceUnmotivated.copy(alpha = if (colors.isDark) 0.22f else 0.13f)
+                    } else {
+                        colors.surfaceElevated
+                    },
+                    border = BorderStroke(
+                        1.dp,
+                        if (group.unmotivatedCount > 0) {
+                            colors.absenceUnmotivated.copy(alpha = if (colors.isDark) 0.72f else 0.56f)
+                        } else {
+                            colors.border
+                        }
+                    )
+                ) {
+                    Text(
+                        text = summaryParts,
+                        color = if (group.unmotivatedCount > 0) {
+                            if (colors.isDark) Color(0xFFFF9494) else Color(0xFFB91C1C)
+                        } else {
+                            colors.textPrimary
+                        },
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
             }
         }
 
@@ -415,29 +439,39 @@ private fun DayAbsenceCard(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             group.items.forEach { abs ->
+                val chipBg = if (abs.isMotivated) {
+                    colors.surfaceElevated
+                } else {
+                    colors.absenceUnmotivated.copy(alpha = if (colors.isDark) 0.18f else 0.12f)
+                }
                 val chipBorder = if (abs.isMotivated) {
                     colors.border
                 } else {
-                    colors.absenceUnmotivated.copy(alpha = 0.45f)
+                    colors.absenceUnmotivated.copy(alpha = if (colors.isDark) 0.65f else 0.50f)
+                }
+                val chipText = if (abs.isMotivated) {
+                    colors.textPrimary
+                } else {
+                    if (colors.isDark) Color(0xFFFFB4B4) else Color(0xFF991B1B)
                 }
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(colors.surfaceElevated, RoundedCornerShape(8.dp))
-                        .border(0.75.dp, chipBorder, RoundedCornerShape(8.dp))
+                        .background(chipBg, RoundedCornerShape(8.dp))
+                        .border(1.dp, chipBorder, RoundedCornerShape(8.dp))
                         .let {
                             if (dateIso != null) it.clickable { onJumpToDate(dateIso, abs.subject) } else it
                         }
-                        .padding(horizontal = 9.dp, vertical = 6.dp),
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    StatusDot(if (abs.isMotivated) colors.textMuted else colors.absenceUnmotivated)
+                    StatusDot(if (abs.isMotivated) colors.textSecondary else colors.absenceUnmotivated)
                     Text(
                         text = "Ora ${abs.periodNumber} · ${abs.subject}",
-                        color = colors.textPrimary,
+                        color = chipText,
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -569,28 +603,39 @@ private fun SubjectAbsenceCard(
                 ) {
                     subjectAbsences.forEach { abs ->
                         val dateIso = GradeCalculator.parseDisplayDateToIso(abs.date)
+                        val chipBg = if (abs.isMotivated) {
+                            colors.surfaceElevated
+                        } else {
+                            colors.absenceUnmotivated.copy(alpha = if (colors.isDark) 0.18f else 0.12f)
+                        }
+                        val chipBorder = if (abs.isMotivated) {
+                            colors.border
+                        } else {
+                            colors.absenceUnmotivated.copy(alpha = if (colors.isDark) 0.65f else 0.50f)
+                        }
+                        val chipText = if (abs.isMotivated) {
+                            colors.textPrimary
+                        } else {
+                            if (colors.isDark) Color(0xFFFFB4B4) else Color(0xFF991B1B)
+                        }
                         Row(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(7.dp))
-                                .background(colors.surfaceElevated, RoundedCornerShape(7.dp))
-                                .border(
-                                    0.75.dp,
-                                    if (abs.isMotivated) colors.border else colors.absenceUnmotivated.copy(alpha = 0.45f),
-                                    RoundedCornerShape(7.dp)
-                                )
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(chipBg, RoundedCornerShape(8.dp))
+                                .border(1.dp, chipBorder, RoundedCornerShape(8.dp))
                                 .let {
                                     if (dateIso != null) it.clickable { onJumpToDate(dateIso, item.subject) } else it
                                 }
-                                .padding(horizontal = 8.dp, vertical = 5.dp),
+                                .padding(horizontal = 9.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            StatusDot(if (abs.isMotivated) colors.textMuted else colors.absenceUnmotivated)
+                            StatusDot(if (abs.isMotivated) colors.textSecondary else colors.absenceUnmotivated)
                             Text(
                                 text = "${GradeCalculator.formatDisplayToShort(abs.date)} · Ora ${abs.periodNumber}",
-                                color = colors.textPrimary,
+                                color = chipText,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }

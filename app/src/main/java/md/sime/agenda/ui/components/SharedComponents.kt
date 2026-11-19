@@ -27,7 +27,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import md.sime.agenda.ui.theme.SimeTheme
@@ -279,10 +281,80 @@ fun VerticalHairlineDivider(modifier: Modifier = Modifier) {
 }
 
 @Composable
+fun EvaluationBadge(
+    text: String,
+    isAbsent: Boolean = false,
+    numericGrade: Int? = null,
+    isQualifier: Boolean = false,
+    isDescriptor: Boolean = false,
+    modifier: Modifier = Modifier,
+    fontSize: TextUnit = 13.sp,
+    paddingValues: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+) {
+    val colors = SimeTheme.colors
+    val parsedNum = numericGrade?.toDouble() ?: text.replace(',', '.').toDoubleOrNull()
+    val (bg, border, fg) = when {
+        isAbsent -> Triple(
+            colors.absenceUnmotivated.copy(alpha = if (colors.isDark) 0.22f else 0.13f),
+            colors.absenceUnmotivated.copy(alpha = if (colors.isDark) 0.72f else 0.56f),
+            if (colors.isDark) Color(0xFFFF9494) else Color(0xFFB91C1C)
+        )
+        isDescriptor -> Triple(
+            if (colors.isDark) Color(0xFFA5B4FC).copy(alpha = 0.17f) else Color(0xFF4F46E5).copy(alpha = 0.11f),
+            if (colors.isDark) Color(0xFFA5B4FC).copy(alpha = 0.50f) else Color(0xFF4F46E5).copy(alpha = 0.42f),
+            if (colors.isDark) Color(0xFFD4DCFF) else Color(0xFF3730A3)
+        )
+        isQualifier -> Triple(
+            colors.gradeLowMid.copy(alpha = if (colors.isDark) 0.20f else 0.14f),
+            colors.gradeLowMid.copy(alpha = if (colors.isDark) 0.62f else 0.52f),
+            if (colors.isDark) Color(0xFFF3D9B1) else Color(0xFF784F14)
+        )
+        parsedNum != null && parsedNum >= 9.0 -> Triple(
+            if (colors.isDark) Color(0xFFDEBC85).copy(alpha = 0.18f) else Color(0xFFA6762E).copy(alpha = 0.14f),
+            if (colors.isDark) Color(0xFFE4C38C).copy(alpha = 0.58f) else Color(0xFF9A6E32).copy(alpha = 0.48f),
+            if (colors.isDark) Color(0xFFF9E8C9) else Color(0xFF6E4711)
+        )
+        parsedNum != null && parsedNum >= 7.0 -> Triple(
+            if (colors.isDark) Color(0xFFE2E8F0).copy(alpha = 0.15f) else Color(0xFF0F172A).copy(alpha = 0.09f),
+            if (colors.isDark) Color(0xFFE2E8F0).copy(alpha = 0.45f) else Color(0xFF0F172A).copy(alpha = 0.30f),
+            if (colors.isDark) Color.White else Color(0xFF0F172A)
+        )
+        parsedNum != null -> Triple(
+            colors.gradeLow.copy(alpha = if (colors.isDark) 0.17f else 0.11f),
+            colors.gradeLow.copy(alpha = if (colors.isDark) 0.55f else 0.44f),
+            if (colors.isDark) Color(0xFFFFB4B4) else Color(0xFF991B1B)
+        )
+        else -> Triple(
+            if (colors.isDark) Color(0xFFA5B4FC).copy(alpha = 0.17f) else Color(0xFF4F46E5).copy(alpha = 0.11f),
+            if (colors.isDark) Color(0xFFA5B4FC).copy(alpha = 0.50f) else Color(0xFF4F46E5).copy(alpha = 0.42f),
+            if (colors.isDark) Color(0xFFD4DCFF) else Color(0xFF3730A3)
+        )
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = bg,
+        border = BorderStroke(1.dp, border)
+    ) {
+        Text(
+            text = text,
+            color = fg,
+            fontSize = fontSize,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = if (isAbsent) 0.7.sp else 0.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(paddingValues)
+        )
+    }
+}
+
+@Composable
 fun StatusDot(color: Color, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .size(4.dp)
-            .background(color, RoundedCornerShape(2.dp))
+            .size(5.dp)
+            .background(color, RoundedCornerShape(3.dp))
     )
 }
