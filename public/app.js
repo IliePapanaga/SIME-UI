@@ -4,7 +4,7 @@
   const STORAGE_CREDS = "agenda_creds_v1";
   const STORAGE_SNAPSHOT = "agenda_snapshot_v1";
   const STORAGE_TOKEN = "agenda_token_v1";
-  const STORAGE_THEME = "agenda_theme_v1";
+  const STORAGE_THEME = "agenda_theme_v2";
   const STORAGE_HW_DONE = "agenda_hw_done_v1";
 
   const QUALIFIER_KEYWORDS = [
@@ -60,7 +60,7 @@
   }
 
   const state = {
-    theme: localStorage.getItem(STORAGE_THEME) || "amoled",
+    theme: localStorage.getItem(STORAGE_THEME) || "system",
     creds: loadJson(STORAGE_CREDS, null),
     sessionToken: loadJson(STORAGE_TOKEN, null),
     snapshot: loadJson(STORAGE_SNAPSHOT, null),
@@ -91,16 +91,37 @@
   };
   if (state.creds?.username) state.loginUsername = state.creds.username;
 
+  function resolveThemeMode(mode) {
+    if (mode === "system" || !mode) {
+      const prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+      return prefersLight ? "light" : "amoled";
+    }
+    return mode;
+  }
+
   function applyTheme(mode) {
-    state.theme = mode;
-    localStorage.setItem(STORAGE_THEME, mode);
-    document.documentElement.setAttribute("data-theme", mode);
+    state.theme = mode || "system";
+    try { localStorage.setItem(STORAGE_THEME, state.theme); } catch {}
+    const resolved = resolveThemeMode(state.theme);
+    document.documentElement.setAttribute("data-theme", resolved);
     const meta = document.getElementById("metaThemeColor");
     if (meta) {
-      meta.setAttribute("content", mode === "light" ? "#f3f4f6" : mode === "dark" ? "#090a0d" : "#000000");
+      meta.setAttribute("content", resolved === "light" ? "#f3f4f6" : resolved === "dark" ? "#090a0d" : "#000000");
     }
   }
   applyTheme(state.theme);
+
+  if (window.matchMedia) {
+    const colorSchemeQuery = window.matchMedia("(prefers-color-scheme: light)");
+    const onSystemThemeChange = () => {
+      if (state.theme === "system") applyTheme("system");
+    };
+    if (colorSchemeQuery.addEventListener) {
+      colorSchemeQuery.addEventListener("change", onSystemThemeChange);
+    } else if (colorSchemeQuery.addListener) {
+      colorSchemeQuery.addListener(onSystemThemeChange);
+    }
+  }
 
   function esc(str) {
     return String(str ?? "")
@@ -1108,7 +1129,8 @@
           <div>
             <div class="kicker" style="margin-bottom:8px;">TEMĂ VIZUALĂ</div>
             <div class="seg-trough">
-              <button class="seg-btn ${state.theme === "amoled" ? "active" : ""}" data-theme="amoled">Negru OLED</button>
+              <button class="seg-btn ${state.theme === "system" ? "active" : ""}" data-theme="system">Sistem</button>
+              <button class="seg-btn ${state.theme === "amoled" ? "active" : ""}" data-theme="amoled">OLED</button>
               <button class="seg-btn ${state.theme === "dark" ? "active" : ""}" data-theme="dark">Întunecat</button>
               <button class="seg-btn ${state.theme === "light" ? "active" : ""}" data-theme="light">Luminos</button>
             </div>

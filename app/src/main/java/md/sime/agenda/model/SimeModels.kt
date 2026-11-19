@@ -10,12 +10,13 @@ enum class UserType(val apexCode: Int, val labelRo: String) {
 }
 
 enum class ThemeMode(val id: String, val label: String) {
-    AMOLED("amoled", "Negru OLED"),
+    SYSTEM("system", "Sistem"),
+    AMOLED("amoled", "OLED"),
     DARK("dark", "Întunecat"),
     LIGHT("light", "Luminos");
 
     companion object {
-        fun fromId(id: String?): ThemeMode = entries.firstOrNull { it.id == id } ?: AMOLED
+        fun fromId(id: String?): ThemeMode = entries.firstOrNull { it.id == id } ?: SYSTEM
     }
 }
 

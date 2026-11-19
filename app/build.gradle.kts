@@ -14,8 +14,8 @@ android {
         applicationId = "md.sime.agenda"
         minSdk = 26
         targetSdk = 34
-        versionCode = if (ciRunNumber != null) 100 + ciRunNumber else 3
-        versionName = if (ciRunNumber != null) "1.2.$ciRunNumber" else "1.2.0"
+        versionCode = if (ciRunNumber != null) 100 + ciRunNumber else 4
+        versionName = if (ciRunNumber != null) "1.2.$ciRunNumber" else "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -31,7 +31,7 @@ class LocalCacheStore(context: Context) {
         prefs.edit().putString(KEY_THEME_MODE, mode.id).apply()
     }
 
-    fun getThemeMode(): ThemeMode = ThemeMode.fromId(prefs.getString(KEY_THEME_MODE, ThemeMode.AMOLED.id))
+    fun getThemeMode(): ThemeMode = ThemeMode.fromId(prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.id))
 
     fun saveLastMainPageUrl(url: String) {
         prefs.edit().putString(KEY_LAST_MAIN_URL, url).apply()
@@ -449,7 +449,7 @@ class LocalCacheStore(context: Context) {
     }
 
     companion object {
-        private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_THEME_MODE = "theme_mode_v2"
         private const val KEY_LAST_MAIN_URL = "last_main_url"
         private const val KEY_COMPLETED_HOMEWORK = "completed_homework_ids"
         private const val KEY_SEEN_MESSAGES = "seen_message_ids"

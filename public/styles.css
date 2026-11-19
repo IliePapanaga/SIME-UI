@@ -101,6 +101,7 @@ button, input {
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   overflow: hidden;
+  flex-shrink: 0;
   transition: border-color 0.16s ease, background-color 0.16s ease;
 }
 
@@ -483,12 +484,12 @@ html[data-theme="light"] .bottom-nav {
 
 .seg-btn {
   flex: 1;
-  padding: 8px 12px;
+  padding: 8px 6px;
   border-radius: 9px;
   border: 0.75px solid transparent;
   background: transparent;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -826,6 +827,10 @@ html[data-theme="light"] .abs-filter-chip {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.modal-sheet > * {
+  flex-shrink: 0;
 }
 
 @media (min-width: 768px) {

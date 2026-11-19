@@ -234,14 +234,15 @@ fun SegmentedGlassToggle(
                         }
                     )
                     .clickable { onSelect(index) }
-                    .padding(vertical = 8.dp, horizontal = 10.dp),
+                    .padding(vertical = 8.dp, horizontal = if (options.size >= 4) 6.dp else 10.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = label,
                     color = if (selected) colors.textPrimary else colors.textMuted,
-                    fontSize = 13.sp,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                    fontSize = if (options.size >= 4) 12.sp else 13.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 1
                 )
             }
         }

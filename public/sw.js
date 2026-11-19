@@ -1,4 +1,4 @@
-const CACHE_NAME = "agenda-shell-v1";
+const CACHE_NAME = "agenda-shell-v2";
 const SHELL_ASSETS = [
   "/",
   "/index.html",
@@ -30,17 +30,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const networkFetch = fetch(event.request)
-        .then((resp) => {
-          if (resp && resp.status === 200 && resp.type === "basic") {
-            const copy = resp.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
-          return resp;
-        })
-        .catch(() => cached);
-      return cached || networkFetch;
-    })
+    fetch(event.request)
+      .then((resp) => {
+        if (resp && resp.status === 200 && resp.type === "basic") {
+          const copy = resp.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return resp;
+      })
+      .catch(() => caches.match(event.request))
   );
 });

@@ -154,7 +154,9 @@ fun SimeAgendaTheme(
     themeMode: ThemeMode,
     content: @Composable () -> Unit
 ) {
+    val systemDark = isSystemInDarkTheme()
     val palette = when (themeMode) {
+        ThemeMode.SYSTEM -> if (systemDark) AmoledPalette else LightPalette
         ThemeMode.AMOLED -> AmoledPalette
         ThemeMode.DARK -> DarkSlatePalette
         ThemeMode.LIGHT -> LightPalette

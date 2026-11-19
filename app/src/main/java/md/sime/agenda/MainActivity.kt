@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -83,9 +84,14 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+            val systemDark = isSystemInDarkTheme()
+            val darkBars = when (themeMode) {
+                ThemeMode.SYSTEM -> systemDark
+                ThemeMode.LIGHT -> false
+                ThemeMode.AMOLED, ThemeMode.DARK -> true
+            }
 
-            LaunchedEffect(themeMode) {
-                val darkBars = themeMode != ThemeMode.LIGHT
+            LaunchedEffect(darkBars) {
                 enableEdgeToEdge(
                     statusBarStyle = if (darkBars) {
                         SystemBarStyle.dark(Color.TRANSPARENT)
