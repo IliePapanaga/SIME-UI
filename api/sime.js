@@ -1,3 +1,5 @@
+const crypto = require("crypto");
+
 const SIME_BASE = "https://agenda.sime.md";
 const PUBLIC_URL = `${SIME_BASE}/ords/r/agenda/main/public`;
 const BROWSER_UA =
@@ -969,22 +971,43 @@ function parseLessonDetailHtml(html) {
   };
 }
 
-async function fetchFullPortalFromMainPage(jar, mainRes) {
-  const mc = mainRes.text;
+function extractMainPageApexContext(mc) {
   const mInst = hiddenInputValue(mc, "p_instance") || hiddenInputValue(mc, "pInstance");
   const mCtx = hiddenInputValue(mc, "pContext");
   const mSalt = hiddenInputValue(mc, "pSalt");
   const mProt = hiddenInputValue(mc, "pPageItemsProtected");
   const eleveId = hiddenInputValue(mc, "P1_ELEVE_ID");
   const eleveCk = dataForChecksum(mc, "P1_ELEVE_ID");
+  const calMatch = mc.match(/"ajaxIdentifier"\s*:\s*"(UkVHSU9OIFRZUEV-fjU0Njg4NjE2[^"]+)"/);
+  const calAjax = calMatch ? unescapeApexId(calMatch[1]) : "";
+  return { mInst, mCtx, mSalt, mProt, eleveId, eleveCk, calAjax };
+}
+
+async function fetchCalendarRange(jar, apexCtx, startCompact, endCompact) {
+  if (!apexCtx.calAjax) return "[]";
+  return callApexAjax(jar, apexCtx.mCtx, {
+    p_flow_id: "104",
+    p_flow_step_id: "1",
+    p_instance: apexCtx.mInst,
+    p_debug: "",
+    p_request: `PLUGIN=${apexCtx.calAjax}`,
+    x01: "GET",
+    x02: startCompact,
+    x03: endCompact,
+    p_json: JSON.stringify({ salt: apexCtx.mSalt })
+  });
+}
+
+async function fetchFullPortalFromMainPage(jar, mainRes) {
+  const mc = mainRes.text;
+  const apexCtx = extractMainPageApexContext(mc);
+  const { mInst, mCtx, mSalt, mProt, eleveId, eleveCk } = apexCtx;
 
   const sem1Match = mc.match(/report\.init\(\s*["']sem1["']\s*,\s*["']([^"']+)["']/);
   const sem2Match = mc.match(/report\.init\(\s*["']sem2["']\s*,\s*["']([^"']+)["']/);
-  const calMatch = mc.match(/"ajaxIdentifier"\s*:\s*"(UkVHSU9OIFRZUEV-fjU0Njg4NjE2[^"]+)"/);
 
   const sem1Ajax = sem1Match ? unescapeApexId(sem1Match[1]) : "";
   const sem2Ajax = sem2Match ? unescapeApexId(sem2Match[1]) : "";
-  const calAjax = calMatch ? unescapeApexId(calMatch[1]) : "";
 
   const reportPayload = JSON.stringify({
     pageItems: {
@@ -1025,19 +1048,7 @@ async function fetchFullPortalFromMainPage(jar, mainRes) {
           p_json: reportPayload
         })
       : Promise.resolve(""),
-    calAjax
-      ? callApexAjax(jar, mCtx, {
-          p_flow_id: "104",
-          p_flow_step_id: "1",
-          p_instance: mInst,
-          p_debug: "",
-          p_request: `PLUGIN=${calAjax}`,
-          x01: "GET",
-          x02: calStart,
-          x03: calEnd,
-          p_json: JSON.stringify({ salt: mSalt })
-        })
-      : Promise.resolve("[]"),
+    fetchCalendarRange(jar, apexCtx, calStart, calEnd),
     eleveId
       ? callApexAjax(jar, mCtx, {
           p_flow_id: "104",
@@ -1115,10 +1126,23 @@ async function handleSwitchStudent(body) {
   return fetchFullPortalFromMainPage(jar, mainRes);
 }
 
+function findMatchingLesson(events, { dateIso, periodNumber, subject }) {
+  const normTarget = normalizeSubject(subject);
+  return (
+    events.find(
+      (ev) => ev.dateIso === dateIso && ev.periodNumber === Number(periodNumber) && normalizeSubject(ev.subject) === normTarget
+    ) ||
+    events.find(
+      (ev) => ev.dateIso === dateIso && normalizeSubject(ev.subject) === normTarget
+    ) ||
+    null
+  );
+}
+
 async function handleLessonDetail(body) {
   const { detailUrl, dateIso, periodNumber, subject, username, password, userType = 2, sessionToken } = body;
   let jar = jarFromCookieString(sessionToken?.cookie);
-  let targetUrl = detailUrl;
+  const targetUrl = detailUrl;
 
   if (targetUrl && jar.size > 0) {
     const res = await fetchWithCookies(jar, targetUrl);
@@ -1141,15 +1165,28 @@ async function handleLessonDetail(body) {
 
   jar = new Map();
   const mainRes = await performApexLogin(jar, username, password, userType);
-  const full = await fetchFullPortalFromMainPage(jar, mainRes);
-  const normTarget = normalizeSubject(subject);
-  const match =
-    full.snapshot.scheduleEvents.find(
-      (ev) => ev.dateIso === dateIso && ev.periodNumber === Number(periodNumber) && normalizeSubject(ev.subject) === normTarget
-    ) ||
-    full.snapshot.scheduleEvents.find(
-      (ev) => ev.dateIso === dateIso && normalizeSubject(ev.subject) === normTarget
-    );
+  const apexCtx = extractMainPageApexContext(mainRes.text);
+  let match = null;
+  let nextSessionToken = null;
+
+  if (apexCtx.calAjax && /^\d{4}-\d{2}-\d{2}$/.test(String(dateIso || ""))) {
+    const dayCompact = String(dateIso).replace(/-/g, "");
+    const dayJsonStr = await fetchCalendarRange(jar, apexCtx, `${dayCompact}000000`, `${dayCompact}235959`);
+    match = findMatchingLesson(parseCalendarEventsArray(dayJsonStr), { dateIso, periodNumber, subject });
+    if (match && match.detailUrl) {
+      nextSessionToken = {
+        cookie: cookieHeaderFromJar(jar),
+        mainPageUrl: mainRes.finalUrl,
+        sessionId: hiddenInputValue(mainRes.text, "pInstance") || apexCtx.mInst || sessionToken?.sessionId || ""
+      };
+    }
+  }
+
+  if (!match || !match.detailUrl) {
+    const full = await fetchFullPortalFromMainPage(jar, mainRes);
+    match = findMatchingLesson(full.snapshot.scheduleEvents, { dateIso, periodNumber, subject });
+    nextSessionToken = full.sessionToken;
+  }
 
   if (!match || !match.detailUrl) {
     throw new Error("Această lecție nu are pagină de detalii disponibilă.");
@@ -1158,8 +1195,54 @@ async function handleLessonDetail(body) {
   const detailRes = await fetchWithCookies(jar, match.detailUrl);
   return {
     detail: parseLessonDetailHtml(detailRes.text),
-    sessionToken: full.sessionToken
+    sessionToken: {
+      ...nextSessionToken,
+      cookie: cookieHeaderFromJar(jar)
+    }
   };
+}
+
+const inflightRequests = new Map();
+
+function buildRequestCoalesceKey(action, body) {
+  const authParts = [
+    String(body.userType ?? 2),
+    String(body.username || "").trim().toLowerCase(),
+    String(body.password || ""),
+    String(body.sessionToken?.mainPageUrl || ""),
+    String(body.sessionToken?.cookie || "")
+  ];
+  if (action === "sync") {
+    const digest = crypto.createHash("sha256").update(authParts.join("\0")).digest("hex");
+    return `sync:${digest}`;
+  }
+  if (action === "lessonDetail") {
+    const parts = [
+      ...authParts,
+      String(body.detailUrl || ""),
+      String(body.dateIso || ""),
+      String(body.periodNumber ?? ""),
+      String(body.subject || "")
+    ];
+    const digest = crypto.createHash("sha256").update(parts.join("\0")).digest("hex");
+    return `detail:${digest}`;
+  }
+  return "";
+}
+
+function coalesceInflight(key, fn) {
+  if (!key) return fn();
+  const existing = inflightRequests.get(key);
+  if (existing) return existing;
+  const promise = Promise.resolve()
+    .then(fn)
+    .finally(() => {
+      if (inflightRequests.get(key) === promise) {
+        inflightRequests.delete(key);
+      }
+    });
+  inflightRequests.set(key, promise);
+  return promise;
 }
 
 module.exports = async function handler(req, res) {
@@ -1176,9 +1259,9 @@ module.exports = async function handler(req, res) {
     const action = body.action || "sync";
     let result;
     if (action === "sync") {
-      result = await handleSync(body);
+      result = await coalesceInflight(buildRequestCoalesceKey("sync", body), () => handleSync(body));
     } else if (action === "lessonDetail") {
-      result = await handleLessonDetail(body);
+      result = await coalesceInflight(buildRequestCoalesceKey("lessonDetail", body), () => handleLessonDetail(body));
     } else if (action === "switchStudent") {
       result = await handleSwitchStudent(body);
     } else {
@@ -1190,3 +1273,4 @@ module.exports = async function handler(req, res) {
     return res.status(status).json({ error: err.message || "Eroare internă de server." });
   }
 };
+module.exports._inflightRequests = inflightRequests;

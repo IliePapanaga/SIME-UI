@@ -7,6 +7,8 @@
   const STORAGE_THEME = "agenda_theme_v2";
   const STORAGE_HW_DONE = "agenda_hw_done_v1";
   const STORAGE_SCHED_LAYOUT = "agenda_sched_layout_v1";
+  const STORAGE_DETAILS = "agenda_details_v1";
+  const AUTO_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
 
   const QUALIFIER_KEYWORDS = [
     "educatie fizica",
@@ -91,7 +93,8 @@
     loginPassword: "",
     loginShowPassword: false,
     pendingScrollCenter: false,
-    scheduleLayout: localStorage.getItem(STORAGE_SCHED_LAYOUT) || "grid"
+    scheduleLayout: localStorage.getItem(STORAGE_SCHED_LAYOUT) || "grid",
+    lessonDetailsCache: loadJson(STORAGE_DETAILS, {})
   };
   if (state.creds?.username) state.loginUsername = state.creds.username;
 
@@ -340,6 +343,32 @@
     return data;
   }
 
+  function clearLessonDetailsCache() {
+    state.lessonDetailsCache = {};
+    saveJson(STORAGE_DETAILS, null);
+  }
+
+  function lessonDetailCacheKey(lesson) {
+    if (!lesson) return "";
+    return `${lesson.dateIso || ""}_${lesson.periodNumber || ""}_${normalizeSubject(lesson.subject || "")}`;
+  }
+
+  function applySyncedSnapshot(data, { resetSims = false, clearDetails = false } = {}) {
+    if (clearDetails) clearLessonDetailsCache();
+    if (data.snapshot && !data.snapshot.updatedAtMillis) {
+      data.snapshot.updatedAtMillis = Date.now();
+    }
+    state.snapshot = data.snapshot;
+    state.sessionToken = data.sessionToken;
+    rebuildSnapshotIndex(data.snapshot);
+    if (resetSims) {
+      state.simMarks = {};
+      state.simQualifiers = {};
+    }
+    saveJson(STORAGE_SNAPSHOT, data.snapshot);
+    saveJson(STORAGE_TOKEN, data.sessionToken);
+  }
+
   async function syncPortal({ silent = false } = {}) {
     if (!state.creds && !state.sessionToken) return;
     if (state.isSyncing) return;
@@ -356,11 +385,7 @@
         sessionToken: state.sessionToken
       });
       if (epoch !== syncEpoch) return;
-      state.snapshot = data.snapshot;
-      state.sessionToken = data.sessionToken;
-      rebuildSnapshotIndex(data.snapshot);
-      saveJson(STORAGE_SNAPSHOT, data.snapshot);
-      saveJson(STORAGE_TOKEN, data.sessionToken);
+      applySyncedSnapshot(data, { clearDetails: !silent });
     } catch (err) {
       if (epoch !== syncEpoch) return;
       if (!silent || !state.snapshot) {
@@ -385,6 +410,7 @@
       return;
     }
     syncEpoch++;
+    const epoch = syncEpoch;
     state.loginLoading = true;
     state.loginError = null;
     render({ part: "all" });
@@ -395,6 +421,7 @@
         password: finalPass,
         userType
       });
+      if (epoch !== syncEpoch) return;
       if (stayLoggedIn) {
         state.creds = { username: finalUser, password: finalPass, userType, stayLoggedIn: true };
         saveJson(STORAGE_CREDS, state.creds);
@@ -402,25 +429,30 @@
         state.creds = null;
         saveJson(STORAGE_CREDS, null);
       }
-      state.sessionToken = data.sessionToken;
-      state.snapshot = data.snapshot;
-      rebuildSnapshotIndex(data.snapshot);
-      state.simMarks = {};
-      state.simQualifiers = {};
+      applySyncedSnapshot(data, { resetSims: true, clearDetails: true });
       state.loginPassword = "";
       state.tab = "home";
-      saveJson(STORAGE_TOKEN, data.sessionToken);
-      saveJson(STORAGE_SNAPSHOT, data.snapshot);
     } catch (err) {
+      if (epoch !== syncEpoch) return;
       state.loginError = err.message || "Autentificare eșuată.";
     } finally {
-      state.loginLoading = false;
-      render({ part: "all" });
+      if (epoch === syncEpoch) {
+        state.loginLoading = false;
+        render({ part: "all" });
+      }
     }
   }
 
   async function openLessonDetail(lesson) {
     if (!lesson.detailUrl) return;
+    const cacheKey = lessonDetailCacheKey(lesson);
+    const cachedDetail = cacheKey && state.lessonDetailsCache ? state.lessonDetailsCache[cacheKey] : null;
+    if (cachedDetail) {
+      state.lessonDetail = { lesson, loading: false, detail: cachedDetail, error: null };
+      render({ part: "modals" });
+      return;
+    }
+    const epoch = syncEpoch;
     state.lessonDetail = { lesson, loading: true, detail: null, error: null };
     render({ part: "modals" });
     try {
@@ -435,18 +467,25 @@
         userType: state.creds?.userType || 2,
         sessionToken: state.sessionToken
       });
+      if (epoch !== syncEpoch) return;
       if (data.sessionToken) {
         state.sessionToken = data.sessionToken;
         saveJson(STORAGE_TOKEN, data.sessionToken);
       }
+      if (cacheKey && data.detail) {
+        state.lessonDetailsCache = { ...(state.lessonDetailsCache || {}), [cacheKey]: data.detail };
+        saveJson(STORAGE_DETAILS, state.lessonDetailsCache);
+      }
       state.lessonDetail = { lesson, loading: false, detail: data.detail, error: null };
     } catch (err) {
+      if (epoch !== syncEpoch) return;
       state.lessonDetail = { lesson, loading: false, detail: null, error: err.message };
     }
     render({ part: "modals" });
   }
 
   async function switchStudent(switchUrl) {
+    const epoch = syncEpoch;
     state.showDossier = false;
     state.isSyncing = true;
     render({ part: "all" });
@@ -459,18 +498,16 @@
         userType: state.creds?.userType || 2,
         sessionToken: state.sessionToken
       });
-      state.snapshot = data.snapshot;
-      state.sessionToken = data.sessionToken;
-      rebuildSnapshotIndex(data.snapshot);
-      state.simMarks = {};
-      state.simQualifiers = {};
-      saveJson(STORAGE_SNAPSHOT, data.snapshot);
-      saveJson(STORAGE_TOKEN, data.sessionToken);
+      if (epoch !== syncEpoch) return;
+      applySyncedSnapshot(data, { resetSims: true, clearDetails: true });
     } catch (err) {
+      if (epoch !== syncEpoch) return;
       state.syncError = err.message;
     } finally {
-      state.isSyncing = false;
-      render({ part: "all" });
+      if (epoch === syncEpoch) {
+        state.isSyncing = false;
+        render({ part: "all" });
+      }
     }
   }
 
@@ -1778,9 +1815,11 @@
         syncEpoch++;
         state.isSyncing = false;
         state.showDossier = false;
+        state.lessonDetail = null;
         state.snapshot = null;
         state.sessionToken = null;
         loginMounted = false;
+        clearLessonDetailsCache();
         saveJson(STORAGE_SNAPSHOT, null);
         saveJson(STORAGE_TOKEN, null);
         render({ part: "all" });
@@ -1790,12 +1829,14 @@
         syncEpoch++;
         state.isSyncing = false;
         state.showDossier = false;
+        state.lessonDetail = null;
         state.snapshot = null;
         state.sessionToken = null;
         state.creds = null;
         state.loginUsername = "";
         state.loginPassword = "";
         loginMounted = false;
+        clearLessonDetailsCache();
         saveJson(STORAGE_SNAPSHOT, null);
         saveJson(STORAGE_TOKEN, null);
         saveJson(STORAGE_CREDS, null);
@@ -1807,6 +1848,9 @@
   setupDelegatedEvents();
   render({ part: "all" });
   if (isLoggedIn()) {
-    syncPortal({ silent: true });
+    const lastSync = Number(state.snapshot?.updatedAtMillis || 0);
+    if (!lastSync || Date.now() - lastSync >= AUTO_SYNC_COOLDOWN_MS) {
+      syncPortal({ silent: true });
+    }
   }
 })();
