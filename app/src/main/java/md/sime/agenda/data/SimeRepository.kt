@@ -259,7 +259,6 @@ class SimeRepository private constructor(context: Context) {
 
     suspend fun logout(clearSavedPassword: Boolean) {
         val sid = _snapshot.value?.sessionId.orEmpty()
-        bridge.logoutSession(sid)
         SimeSyncWorker.cancelSync(appContext)
         cacheStore.clearPortalData()
         _snapshot.value = null
@@ -269,6 +268,7 @@ class SimeRepository private constructor(context: Context) {
         } else {
             credentialStore.setStayLoggedIn(false)
         }
+        bridge.logoutSession(sid)
     }
 
     private fun handleSuccessResult(

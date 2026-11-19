@@ -3,6 +3,7 @@ package md.sime.agenda.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -105,6 +106,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val availableUpdate: StateFlow<AppUpdateInfo?> = _availableUpdate.asStateFlow()
 
     private val checkedWeekMondays = mutableSetOf<String>()
+    private var refreshJob: Job? = null
 
     // Live overall average (updates instantly as marks or simulated marks change)
     val liveOverallAverage: StateFlow<Double?> = combine(
@@ -190,7 +192,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun refreshInBackground(prefetchCalendar: Boolean) {
         if (_isSyncing.value) return
         checkForAppUpdate()
-        viewModelScope.launch {
+        refreshJob = viewModelScope.launch {
             _isSyncing.value = true
             _syncError.value = null
             val res = repo.refreshPortal(prefetchCalendar = prefetchCalendar)
@@ -372,14 +374,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun logout(forgetSavedCredentials: Boolean) {
+        refreshJob?.cancel()
+        refreshJob = null
+        _showDossierSheet.value = false
+        _isSyncing.value = false
+        _isLoggedIn.value = false
+        _simulatedMarks.value = emptyMap()
+        _simulatedQualifiers.value = emptyMap()
+        _loginError.value = null
         viewModelScope.launch {
-            _showDossierSheet.value = false
             repo.logout(clearSavedPassword = forgetSavedCredentials)
             _savedCredentials.value = repo.getSavedCredentials()
-            _isLoggedIn.value = false
-            _simulatedMarks.value = emptyMap()
-            _simulatedQualifiers.value = emptyMap()
-            _loginError.value = null
         }
     }
 

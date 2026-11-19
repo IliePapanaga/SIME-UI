@@ -1,9 +1,9 @@
-const CACHE_NAME = "agenda-shell-v7";
+const CACHE_NAME = "agenda-shell-v8";
 const SHELL_ASSETS = [
   "/",
   "/index.html",
-  "/styles.css?v=1.2.6",
-  "/app.js?v=1.2.6",
+  "/styles.css?v=1.2.7",
+  "/app.js?v=1.2.7",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
@@ -30,7 +30,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-cache" })
       .then((resp) => {
         if (resp && resp.status === 200 && resp.type === "basic") {
           const copy = resp.clone();

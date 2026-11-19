@@ -35,6 +35,16 @@
   });
 
   if ("serviceWorker" in navigator) {
+    const hadSwController = Boolean(navigator.serviceWorker.controller);
+    if (hadSwController && typeof navigator.serviceWorker.addEventListener === "function") {
+      let refreshingSw = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!refreshingSw) {
+          refreshingSw = true;
+          window.location.reload();
+        }
+      });
+    }
     navigator.serviceWorker.register("/sw.js").then((reg) => {
       if (reg && typeof reg.update === "function") reg.update().catch(() => {});
     }).catch(() => {});
@@ -370,12 +380,12 @@
   }
 
   async function syncPortal({ silent = false } = {}) {
-    if (!state.creds && !state.sessionToken) return;
+    if (!isLoggedIn()) return;
     if (state.isSyncing) return;
     const epoch = syncEpoch;
     state.isSyncing = true;
     state.syncError = null;
-    if (isLoggedIn()) render({ part: "chrome" });
+    render({ part: "chrome" });
     try {
       const data = await apiCall({
         action: "sync",
@@ -394,7 +404,14 @@
     } finally {
       if (epoch === syncEpoch) {
         state.isSyncing = false;
-        if (isLoggedIn()) render({ part: "all" });
+        if (isLoggedIn()) {
+          if (state.showDossier || state.lessonDetail) {
+            render({ part: "chrome" });
+            render({ part: "tab" });
+          } else {
+            render({ part: "all" });
+          }
+        }
       }
     }
   }
@@ -1236,7 +1253,7 @@
               <div style="font-size:19px;font-weight:600;">${esc(p.fullName || "Elev")}</div>
               ${p.schoolName ? `<div class="secondary" style="font-size:13px;margin-top:2px;">${esc(p.schoolName)}</div>` : ""}
             </div>
-            <button id="closeDossier" class="icon-btn" style="font-size:18px;">✕</button>
+            <button type="button" id="closeDossier" class="icon-btn" style="font-size:18px;">✕</button>
           </div>
 
           <div class="glass-card" style="padding:12px;background:var(--bg);">
@@ -1251,10 +1268,10 @@
           <div>
             <div class="kicker" style="margin-bottom:8px;">TEMĂ VIZUALĂ</div>
             <div class="seg-trough">
-              <button class="seg-btn ${state.theme === "system" ? "active" : ""}" data-theme="system">Sistem</button>
-              <button class="seg-btn ${state.theme === "amoled" ? "active" : ""}" data-theme="amoled">OLED</button>
-              <button class="seg-btn ${state.theme === "dark" ? "active" : ""}" data-theme="dark">Întunecat</button>
-              <button class="seg-btn ${state.theme === "light" ? "active" : ""}" data-theme="light">Luminos</button>
+              <button type="button" class="seg-btn ${state.theme === "system" ? "active" : ""}" data-theme="system">Sistem</button>
+              <button type="button" class="seg-btn ${state.theme === "amoled" ? "active" : ""}" data-theme="amoled">OLED</button>
+              <button type="button" class="seg-btn ${state.theme === "dark" ? "active" : ""}" data-theme="dark">Întunecat</button>
+              <button type="button" class="seg-btn ${state.theme === "light" ? "active" : ""}" data-theme="light">Luminos</button>
             </div>
           </div>
 
@@ -1274,8 +1291,8 @@
             </div>
           ` : ""}
 
-          <button id="btnLogoutKeep" class="btn-outline">Deconectare (păstrează login rapid)</button>
-          <button id="btnLogoutForget" style="background:none;border:none;color:var(--rose);font-size:13px;font-weight:500;cursor:pointer;padding:4px;">Șterge datele și parola salvată</button>
+          <button type="button" id="btnLogoutKeep" class="btn-outline">Deconectare (păstrează login rapid)</button>
+          <button type="button" id="btnLogoutForget" style="background:none;border:none;color:var(--rose);font-size:13px;font-weight:500;cursor:pointer;padding:4px;">Șterge datele și parola salvată</button>
         </div>
       </div>
     `;
@@ -1564,6 +1581,37 @@
     }
   }
 
+  function performLogout({ forgetCreds = false } = {}) {
+    syncEpoch++;
+    state.isSyncing = false;
+    state.loginLoading = false;
+    state.showDossier = false;
+    state.lessonDetail = null;
+    state.snapshot = null;
+    state.sessionToken = null;
+    state.syncError = null;
+    state.loginError = null;
+    state.loginUsername = "";
+    state.loginPassword = "";
+    shellMounted = false;
+    lastShellProfileKey = null;
+    lastRenderedTab = null;
+    loginMounted = false;
+    eventsByDate = new Map();
+    eventsById = new Map();
+    clearLessonDetailsCache();
+    saveJson(STORAGE_SNAPSHOT, null);
+    saveJson(STORAGE_TOKEN, null);
+    if (forgetCreds) {
+      state.creds = null;
+      saveJson(STORAGE_CREDS, null);
+    }
+    render({ part: "all" });
+    if (typeof window !== "undefined" && window.scrollTo) {
+      window.scrollTo(0, 0);
+    }
+  }
+
   function setupDelegatedEvents() {
     const root = document.getElementById("app");
     if (!root || root._agendaBound) return;
@@ -1596,8 +1644,24 @@
     });
 
     root.addEventListener("click", async (e) => {
-      const target = e.target;
-      if (!target) return;
+      const rawTarget = e.target;
+      const target = rawTarget && typeof rawTarget.closest === "function"
+        ? rawTarget
+        : rawTarget?.parentElement;
+      if (!target || typeof target.closest !== "function") return;
+
+      if (target.closest("#btnLogoutKeep")) {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        performLogout({ forgetCreds: false });
+        return;
+      }
+      if (target.closest("#btnLogoutForget")) {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        performLogout({ forgetCreds: true });
+        return;
+      }
 
       if (target.id === "dossierBackdrop" || target.closest("#closeDossier")) {
         state.showDossier = false;
@@ -1786,37 +1850,6 @@
         deferredInstallPrompt = null;
         render({ part: "modals" });
         return;
-      }
-      if (target.closest("#btnLogoutKeep")) {
-        syncEpoch++;
-        state.isSyncing = false;
-        state.showDossier = false;
-        state.lessonDetail = null;
-        state.snapshot = null;
-        state.sessionToken = null;
-        loginMounted = false;
-        clearLessonDetailsCache();
-        saveJson(STORAGE_SNAPSHOT, null);
-        saveJson(STORAGE_TOKEN, null);
-        render({ part: "all" });
-        return;
-      }
-      if (target.closest("#btnLogoutForget")) {
-        syncEpoch++;
-        state.isSyncing = false;
-        state.showDossier = false;
-        state.lessonDetail = null;
-        state.snapshot = null;
-        state.sessionToken = null;
-        state.creds = null;
-        state.loginUsername = "";
-        state.loginPassword = "";
-        loginMounted = false;
-        clearLessonDetailsCache();
-        saveJson(STORAGE_SNAPSHOT, null);
-        saveJson(STORAGE_TOKEN, null);
-        saveJson(STORAGE_CREDS, null);
-        render({ part: "all" });
       }
     });
   }
