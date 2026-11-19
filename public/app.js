@@ -541,7 +541,7 @@
 
           <div class="input-group">
             <label class="kicker" for="inpUser">Nume utilizator</label>
-            <input id="inpUser" class="text-input" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex: ipapanaga6" value="${esc(state.loginUsername)}" />
+            <input id="inpUser" class="text-input" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Introdu numele de utilizator" value="${esc(state.loginUsername)}" />
           </div>
 
           <div class="input-group">
