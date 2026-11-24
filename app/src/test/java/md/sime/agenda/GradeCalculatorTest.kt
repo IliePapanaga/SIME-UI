@@ -45,18 +45,59 @@ class GradeCalculatorTest {
 
         // With teza: ((9+10)/2 + 8) / 2 = (9.5 + 8)/2 = 8.75
         val mathWithTeza = GradeCalculator.calculateSubjectAverage(math.numericGrades, math.teza)
-        assertEquals(8.75, mathWithTeza!!, 0.001)
+        assertEquals(8.75, mathWithTeza!!, 0.0001)
 
-        // Overall average without simulation: (10.0 + 8.75) / 2 = 9.375
+        // Overall average without simulation: (10.0 + 8.75) / 2 = 9.375 -> truncated to 9.37
         val overallBefore = GradeCalculator.calculateOverallAverage(listOf(bio, math))
-        assertEquals(9.375, overallBefore!!, 0.001)
+        assertEquals(9.37, overallBefore!!, 0.0001)
+        assertEquals("9.37", GradeCalculator.formatAverage(overallBefore))
 
-        // Simulate adding a 10 to Matematică: current mean (9+10+10)/3 = 9.6667, with teza 8 => 8.8333
+        // Simulate adding a 10 to Matematică: current mean (9+10+10)/3 = 9.6667, with teza 8 => 8.8333 -> 8.83
+        // Overall: (10.0 + 8.83) / 2 = 9.415 -> truncated to 9.41
         val overallAfter = GradeCalculator.calculateOverallAverage(
             listOf(bio, math),
             simulatedBySubject = mapOf("Matematică" to listOf(10))
         )
-        assertEquals((10.0 + ((29.0 / 3.0 + 8.0) / 2.0)) / 2.0, overallAfter!!, 0.001)
+        assertEquals(9.41, overallAfter!!, 0.0001)
+        assertEquals("9.41", GradeCalculator.formatAverage(overallAfter))
+    }
+
+    @Test
+    fun averages_truncateWithoutRoundingUp() {
+        // 29 / 3 = 9.6666... -> 9.66 (not 9.67)
+        val avg966 = GradeCalculator.calculateSubjectAverage(listOf(10, 10, 9), null)
+        assertEquals(9.66, avg966!!, 0.0001)
+        assertEquals("9.66", GradeCalculator.formatAverage(avg966))
+        assertEquals("9.66", GradeCalculator.formatAverage(9.669))
+
+        // Exact floating-point edge case (8.29 * 100 = 828.9999999999999 in IEEE-754)
+        assertEquals(8.29, GradeCalculator.truncateTo2(8.29), 0.0001)
+        assertEquals("8.29", GradeCalculator.formatAverage(8.29))
+
+        // Whole semester overall average also truncates: (10.00 + 10.00 + 9.00) / 3 = 9.666... -> 9.66
+        val mkSubj = { name: String, marks: List<Int> ->
+            SubjectGrades(
+                semester = 1,
+                subject = name,
+                rawEntries = marks.map { it.toString() },
+                datedGrades = marks.mapIndexed { idx, v -> DatedGrade("${name}_$idx", v, v.toString()) },
+                numericGrades = marks,
+                qualifiers = emptyList(),
+                teza = null,
+                tezaRaw = null,
+                officialAverage = null,
+                liveAverage = null
+            )
+        }
+        val semOverall = GradeCalculator.calculateOverallAverage(
+            listOf(
+                mkSubj("S1", listOf(10)),
+                mkSubj("S2", listOf(10)),
+                mkSubj("S3", listOf(9))
+            )
+        )
+        assertEquals(9.66, semOverall!!, 0.0001)
+        assertEquals("9.66", GradeCalculator.formatAverage(semOverall))
     }
 
     @Test

@@ -152,7 +152,7 @@ private fun sampleSnapshot(): PortalSnapshot = PortalSnapshot(
             teza = null,
             tezaRaw = null,
             officialAverage = null,
-            liveAverage = 9.67
+            liveAverage = 9.66
         ),
         SubjectGrades(
             semester = 1,
@@ -210,7 +210,7 @@ fun HomePreview() {
             HomeScreen(
                 snapshot = sampleSnapshot(),
                 scheduleEvents = sampleLessons(),
-                liveOverallAverage = 9.84,
+                liveOverallAverage = 9.83,
                 completedHomeworkIds = emptySet(),
                 onToggleHomework = {},
                 onJumpToScheduleDate = { _, _ -> },
@@ -232,7 +232,7 @@ fun GradesPreview() {
                 selectedSemester = 1,
                 simulatedMarks = emptyMap(),
                 simulatedQualifiers = mapOf("Educație fizică" to listOf("Bine")),
-                liveOverallAverage = 9.84,
+                liveOverallAverage = 9.83,
                 onSelectSemester = {},
                 onAddSimulatedMark = { _, _ -> },
                 onRemoveLastSimulatedMark = {},

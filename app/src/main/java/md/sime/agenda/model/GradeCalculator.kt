@@ -5,6 +5,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlin.math.truncate
 
 object GradeCalculator {
 
@@ -156,24 +157,34 @@ object GradeCalculator {
     }
 
     /**
-     * Computes live subject average.
+     * Truncates a decimal value to 2 decimal places without rounding up
+     * (e.g. 9.6666... -> 9.66, 9.375 -> 9.37).
+     */
+    fun truncateTo2(value: Double): Double {
+        val eps = if (value >= 0.0) 1e-9 else -1e-9
+        return truncate(value * 100.0 + eps) / 100.0
+    }
+
+    /**
+     * Computes live subject average (truncated to 2 decimals).
      * Standard Moldova rule: arithmetic mean of numeric grades;
      * if a Teză grade exists, average of (mean of current grades) and (Teză).
      */
     fun calculateSubjectAverage(numericGrades: List<Int>, teza: Int?): Double? {
         if (numericGrades.isEmpty() && teza == null) return null
-        if (numericGrades.isEmpty()) return teza?.toDouble()
+        if (numericGrades.isEmpty()) return teza?.toDouble()?.let { truncateTo2(it) }
         val mean = numericGrades.average()
-        return if (teza != null) {
+        val raw = if (teza != null) {
             (mean + teza.toDouble()) / 2.0
         } else {
             mean
         }
+        return truncateTo2(raw)
     }
 
     /**
      * Computes live overall GPA across all subjects with a numeric average,
-     * merging any user-simulated grades per subject.
+     * merging any user-simulated grades per subject (truncated to 2 decimals).
      */
     fun calculateOverallAverage(
         subjects: List<SubjectGrades>,
@@ -183,7 +194,7 @@ object GradeCalculator {
             val extra = simulatedBySubject[subject.subject].orEmpty()
             calculateSubjectAverage(subject.numericGrades + extra, subject.teza)
         }
-        return if (averages.isEmpty()) null else averages.average()
+        return if (averages.isEmpty()) null else truncateTo2(averages.average())
     }
 
     /**
@@ -387,6 +398,6 @@ object GradeCalculator {
     }
 
     fun formatAverage(avg: Double?): String {
-        return if (avg == null) "—" else String.format(Locale.US, "%.2f", avg)
+        return if (avg == null) "—" else String.format(Locale.US, "%.2f", truncateTo2(avg))
     }
 }

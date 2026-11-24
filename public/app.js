@@ -255,11 +255,23 @@
     return "NUMERIC";
   }
 
+  function truncateTo2(num) {
+    if (num == null || Number.isNaN(Number(num))) return null;
+    const n = Number(num);
+    return Math.trunc(n * 100 + (n >= 0 ? 1e-9 : -1e-9)) / 100;
+  }
+
+  function formatAvg(num) {
+    const t = truncateTo2(num);
+    return t != null ? t.toFixed(2) : "—";
+  }
+
   function calculateSubjectAvg(numericGrades, teza) {
     if ((!numericGrades || numericGrades.length === 0) && teza == null) return null;
-    if (!numericGrades || numericGrades.length === 0) return Number(teza);
+    if (!numericGrades || numericGrades.length === 0) return truncateTo2(Number(teza));
     const mean = numericGrades.reduce((a, b) => a + b, 0) / numericGrades.length;
-    return teza != null ? (mean + Number(teza)) / 2 : mean;
+    const raw = teza != null ? (mean + Number(teza)) / 2 : mean;
+    return truncateTo2(raw);
   }
 
   function calculateQualifierSummary(qualifiers, officialAvg) {
@@ -332,7 +344,7 @@
     const subjects = getEnrichedSemesterSubjects(sem);
     const avgs = subjects.map((s) => s.liveAverage).filter((v) => v != null);
     if (avgs.length === 0) return null;
-    return avgs.reduce((a, b) => a + b, 0) / avgs.length;
+    return truncateTo2(avgs.reduce((a, b) => a + b, 0) / avgs.length);
   }
 
   function hasAnySimulated() {
@@ -662,7 +674,7 @@
 
     const totalAbs = (s.cumulativeAbsences?.sem1Total || 0) + (s.cumulativeAbsences?.sem2Total || 0);
     const overall = getLiveOverallAverage(state.selectedSemester);
-    const overallTxt = overall != null ? overall.toFixed(2) : "—";
+    const overallTxt = formatAvg(overall);
 
     const lessonsHtml = previewLessons.length === 0
       ? `<div class="glass-card" style="padding:14px;font-size:13px;" ><span class="secondary">Nicio lecție programată. Deschide Orar pentru săptămâni.</span></div>`
@@ -921,7 +933,7 @@
           } else if (evalType === "DESCRIPTOR_ONLY") {
             rightHeader = renderEvalBadge("Descriptori", { isDescriptor: true });
           } else if (sub.liveAverage != null) {
-            rightHeader = renderEvalBadge(sub.liveAverage.toFixed(2), { numericGrade: sub.liveAverage });
+            rightHeader = renderEvalBadge(formatAvg(sub.liveAverage), { numericGrade: sub.liveAverage });
           } else {
             rightHeader = `<span class="muted" style="font-size:18px;font-weight:600;">—</span>`;
           }
@@ -1001,7 +1013,7 @@
             <div class="secondary" style="font-size:12px;margin-top:4px;">${totalMarks} evaluări · ${gradedCount} discipline cu medie</div>
           </div>
           <div class="${anySim ? "bronze" : ""}" style="font-size:32px;font-weight:300;">
-            ${overall != null ? overall.toFixed(2) : "—"}
+            ${formatAvg(overall)}
           </div>
         </div>
         <div class="hairline" style="margin:12px 0 10px;"></div>

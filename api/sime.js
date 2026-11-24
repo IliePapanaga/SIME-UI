@@ -330,11 +330,18 @@ function parseDisplayDateToEpochDay(dateDisplay) {
   return Math.floor(Date.parse(`${iso}T00:00:00Z`) / 86400000);
 }
 
+function truncateTo2(num) {
+  if (num == null || Number.isNaN(Number(num))) return null;
+  const n = Number(num);
+  return Math.trunc(n * 100 + (n >= 0 ? 1e-9 : -1e-9)) / 100;
+}
+
 function calculateSubjectAverage(numericGrades, teza) {
   if ((!numericGrades || numericGrades.length === 0) && teza == null) return null;
-  if (!numericGrades || numericGrades.length === 0) return Number(teza);
+  if (!numericGrades || numericGrades.length === 0) return truncateTo2(Number(teza));
   const mean = numericGrades.reduce((a, b) => a + b, 0) / numericGrades.length;
-  return teza != null ? (mean + Number(teza)) / 2 : mean;
+  const raw = teza != null ? (mean + Number(teza)) / 2 : mean;
+  return truncateTo2(raw);
 }
 
 function parseSemesterGradesHtml(reportHtml, semester) {

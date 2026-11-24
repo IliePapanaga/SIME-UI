@@ -1,9 +1,9 @@
-const CACHE_NAME = "agenda-shell-v10";
+const CACHE_NAME = "agenda-shell-v11";
 const SHELL_ASSETS = [
   "/",
   "/index.html",
-  "/styles.css?v=1.2.9",
-  "/app.js?v=1.2.9",
+  "/styles.css?v=1.2.10",
+  "/app.js?v=1.2.10",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
