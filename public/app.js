@@ -392,6 +392,49 @@
     saveJson(STORAGE_TOKEN, data.sessionToken);
   }
 
+  function getActiveStudentId() {
+    const selected = (state.snapshot?.studentOptions || []).find((o) => o.isSelected);
+    return selected?.id || state.sessionToken?.selectedStudentId || "";
+  }
+
+  function formatStudentName(raw) {
+    return String(raw || "")
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+
+  function formatStudentChipLabel(opt, allOpts) {
+    const formatted = formatStudentName(opt?.name || "");
+    if (!allOpts || allOpts.length <= 1) return formatted;
+    const wordsList = allOpts.map((o) => formatStudentName(o?.name || "").split(" ").filter(Boolean));
+    const firstWord = wordsList[0]?.[0];
+    const allShareSurname = firstWord && wordsList.every((w) => w.length >= 2 && w[0] === firstWord);
+    if (allShareSurname) {
+      return formatted.split(" ").slice(1).join(" ") || formatted;
+    }
+    return formatted;
+  }
+
+  function renderStudentSwitcherBar() {
+    const opts = state.snapshot?.studentOptions || [];
+    if (opts.length <= 1) return "";
+    return `
+      <div class="student-bar">
+        <div class="student-bar-inner">
+          ${opts.map((o) => `
+            <button type="button" class="student-chip ${o.isSelected ? "active" : ""}" data-switch-student="${esc(o.switchUrl)}" data-student-id="${esc(o.id)}" ${state.isSyncing ? "disabled" : ""}>
+              ${esc(formatStudentChipLabel(o, opts))}
+            </button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
   async function syncPortal({ silent = false } = {}) {
     if (!isLoggedIn()) return;
     if (state.isSyncing) return;
@@ -405,7 +448,8 @@
         username: state.creds?.username,
         password: state.creds?.password,
         userType: state.creds?.userType || 2,
-        sessionToken: state.sessionToken
+        sessionToken: state.sessionToken,
+        selectedStudentId: getActiveStudentId()
       });
       if (epoch !== syncEpoch) return;
       applySyncedSnapshot(data, { clearDetails: !silent });
@@ -495,7 +539,8 @@
         username: state.creds?.username,
         password: state.creds?.password,
         userType: state.creds?.userType || 2,
-        sessionToken: state.sessionToken
+        sessionToken: state.sessionToken,
+        selectedStudentId: getActiveStudentId()
       });
       if (epoch !== syncEpoch) return;
       if (data.sessionToken) {
@@ -514,21 +559,36 @@
     render({ part: "modals" });
   }
 
-  async function switchStudent(switchUrl) {
+  async function switchStudent(switchUrl, studentId = "") {
+    const targetId = studentId || "";
+    const activeId = getActiveStudentId();
+    if (targetId && activeId && targetId === activeId) {
+      if (state.showDossier) {
+        state.showDossier = false;
+        render({ part: "modals" });
+      }
+      return;
+    }
+    syncEpoch++;
     const epoch = syncEpoch;
     state.showDossier = false;
+    state.lessonDetail = null;
+    state.highlightedSubject = null;
+    state.syncError = null;
     state.isSyncing = true;
     render({ part: "all" });
     try {
       const data = await apiCall({
         action: "switchStudent",
         switchUrl,
+        studentId: targetId,
         username: state.creds?.username,
         password: state.creds?.password,
         userType: state.creds?.userType || 2,
         sessionToken: state.sessionToken
       });
       if (epoch !== syncEpoch) return;
+      state.expandedSubjects = new Set();
       applySyncedSnapshot(data, { resetSims: true, clearDetails: true });
     } catch (err) {
       if (epoch !== syncEpoch) return;
@@ -1274,7 +1334,7 @@
             <div style="display:flex;flex-direction:column;gap:6px;">
               <div class="kicker">SCHIMBĂ ELEVUL</div>
               ${opts.map((o) => `
-                <button type="button" class="seg-btn ${o.isSelected ? "active" : ""}" style="border:0.75px solid var(--border);" data-switch-student="${esc(o.switchUrl)}">${esc(o.name)}</button>
+                <button type="button" class="seg-btn ${o.isSelected ? "active" : ""}" style="border:0.75px solid var(--border);" data-switch-student="${esc(o.switchUrl)}" data-student-id="${esc(o.id)}">${esc(formatStudentName(o.name))}</button>
               `).join("")}
             </div>
           ` : ""}
@@ -1431,6 +1491,10 @@
       sideRefresh.textContent = state.isSyncing ? "Se actualizează..." : "Actualizează acum";
     }
 
+    document.querySelectorAll(".student-chip").forEach((chip) => {
+      chip.disabled = state.isSyncing;
+    });
+
     const errSlot = document.getElementById("syncErrSlot");
     if (errSlot) {
       const errHtml = state.syncError
@@ -1503,7 +1567,7 @@
     const classSuffix = p.className ? `AGENDA · ${p.className}` : "AGENDA";
     const curTab = TABS.find((t) => t.id === state.tab) || TABS[0];
     const dossierLabel = p.className ? `${p.initials || "AE"} · ${p.className}` : (p.initials || "AE");
-    const profileKey = `${p.fullName || ""}|${p.className || ""}|${p.shortName || ""}`;
+    const profileKey = `${p.fullName || ""}|${p.className || ""}|${p.shortName || ""}|${getActiveStudentId()}|${(state.snapshot?.studentOptions || []).length}`;
 
     if (!shellMounted || lastShellProfileKey !== profileKey) {
       root.innerHTML = `
@@ -1540,6 +1604,7 @@
                   <button class="dossier-pill" id="btnDossier">${esc(dossierLabel)}</button>
                 </div>
               </div>
+              <div id="studentBarSlot">${renderStudentSwitcherBar()}</div>
               <div id="syncErrSlot"></div>
             </header>
 
@@ -1866,7 +1931,10 @@
       }
       const switchBtn = target.closest("[data-switch-student]");
       if (switchBtn) {
-        switchStudent(switchBtn.getAttribute("data-switch-student"));
+        switchStudent(
+          switchBtn.getAttribute("data-switch-student"),
+          switchBtn.getAttribute("data-student-id") || ""
+        );
         return;
       }
       if (target.closest("#btnPwaInstall") && deferredInstallPrompt) {

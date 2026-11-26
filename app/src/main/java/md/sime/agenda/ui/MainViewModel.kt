@@ -359,13 +359,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun switchStudent(switchUrl: String) {
+        refreshJob?.cancel()
+        refreshJob = null
         viewModelScope.launch {
             _showDossierSheet.value = false
             _isSyncing.value = true
-            repo.switchStudent(switchUrl)
+            _syncError.value = null
+            _highlightedLessonSubject.value = null
+            _lessonDetailState.value = null
+            val res = repo.switchStudent(switchUrl)
             _isSyncing.value = false
-            _simulatedMarks.value = emptyMap()
-            _simulatedQualifiers.value = emptyMap()
+            res.onSuccess {
+                checkedWeekMondays.clear()
+                _simulatedMarks.value = emptyMap()
+                _simulatedQualifiers.value = emptyMap()
+            }.onFailure { err ->
+                _syncError.value = err.message
+            }
         }
     }
 

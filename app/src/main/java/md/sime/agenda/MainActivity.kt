@@ -15,7 +15,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +65,7 @@ import md.sime.agenda.notifications.NotificationHelper
 import md.sime.agenda.ui.AppTab
 import md.sime.agenda.ui.MainViewModel
 import md.sime.agenda.ui.components.HairlineDivider
+import md.sime.agenda.ui.components.PillToggle
 import md.sime.agenda.ui.components.liquidGlass
 import md.sime.agenda.ui.screens.AbsencesScreen
 import md.sime.agenda.ui.screens.DossierSheet
@@ -259,6 +262,46 @@ private fun SimeAppRoot(viewModel: MainViewModel) {
                                 color = colors.textPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                val studentOpts = snapshot?.studentOptions.orEmpty()
+                if (studentOpts.size > 1) {
+                    HairlineDivider()
+                    val formattedNames = studentOpts.map { opt ->
+                        opt.name.trim().lowercase().split(Regex("\\s+"))
+                            .filter { it.isNotBlank() }
+                            .joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
+                    }
+                    val firstWord = formattedNames.firstOrNull()?.substringBefore(" ")
+                    val shareSurname = !firstWord.isNullOrBlank() && formattedNames.all {
+                        val parts = it.split(" ")
+                        parts.size >= 2 && parts[0] == firstWord
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        studentOpts.forEachIndexed { idx, opt ->
+                            val label = if (shareSurname) {
+                                formattedNames[idx].substringAfter(" ").ifBlank { formattedNames[idx] }
+                            } else {
+                                formattedNames[idx]
+                            }
+                            PillToggle(
+                                label = label,
+                                selected = opt.isSelected,
+                                onClick = {
+                                    if (!opt.isSelected && !isSyncing) {
+                                        viewModel.switchStudent(opt.switchUrl)
+                                    }
+                                }
                             )
                         }
                     }

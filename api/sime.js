@@ -104,7 +104,16 @@ async function fetchWithCookies(jar, url, options = {}) {
     if (resp.status >= 300 && resp.status < 400) {
       const loc = resp.headers.get("location");
       if (!loc) return { resp, finalUrl: currentUrl, text: await resp.text() };
-      currentUrl = new URL(loc, currentUrl).toString();
+      let nextUrl;
+      try {
+        nextUrl = new URL(loc, currentUrl);
+      } catch {
+        return { resp, finalUrl: currentUrl, text: await resp.text() };
+      }
+      if (nextUrl.protocol !== "http:" && nextUrl.protocol !== "https:") {
+        return { resp, finalUrl: currentUrl, text: await resp.text() };
+      }
+      currentUrl = nextUrl.toString();
       if (resp.status === 303 || (resp.status !== 307 && resp.status !== 308 && method === "POST")) {
         method = "GET";
         body = undefined;
@@ -623,6 +632,43 @@ function parseCalendarEventsArray(jsonStr) {
   return Array.from(eventsById.values()).sort((a, b) => a.dateIso.localeCompare(b.dateIso) || a.periodNumber - b.periodNumber);
 }
 
+function extractUserEleveId(url) {
+  const m = String(url || "").match(/[?&]user_eleve_id=([A-Za-z0-9]+)/i);
+  return m ? m[1] : "";
+}
+
+function parseStudentOptionsFromHtml(mc, fullName = "") {
+  const studentOptions = [];
+  const seenStudentIds = new Set();
+  const navMatch = mc.match(/id=["']t_TreeNav["'][^>]*>([\s\S]*?)<\/ul>/i) ||
+    mc.match(/<nav[^>]*aria-label=["']Application["'][^>]*>([\s\S]*?)<\/nav>/i) ||
+    mc.match(/class=["'][^"']*t-TreeNav[^"']*["'][^>]*>([\s\S]*?)<\/ul>/i);
+  if (navMatch) {
+    for (const am of navMatch[1].matchAll(/<li([^>]*)>\s*<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+      const liAttrs = am[1] || "";
+      const href = decodeHtml(am[2]).trim();
+      const name = stripInlineTags(am[3]).replace(/\[.*?\]/g, "").replace(/\s+/g, " ").trim();
+      if (!name || !href) continue;
+      const id = extractUserEleveId(href) || name;
+      if (seenStudentIds.has(id)) continue;
+      seenStudentIds.add(id);
+      studentOptions.push({
+        id,
+        name,
+        switchUrl: href.startsWith("http") ? href : `${SIME_BASE}${href}`,
+        isSelected: /is-current/i.test(liAttrs) || /data-current=["']true["']/i.test(liAttrs)
+      });
+    }
+  }
+  if (studentOptions.length > 0 && !studentOptions.some((opt) => opt.isSelected)) {
+    const normFull = String(fullName || "").replace(/\s+/g, " ").trim().toLowerCase();
+    const matched = (normFull && studentOptions.find((opt) => opt.name.toLowerCase() === normFull))
+      || (studentOptions.length === 1 ? studentOptions[0] : null);
+    if (matched) matched.isSelected = true;
+  }
+  return studentOptions;
+}
+
 function parseMainPageData(mc, sem1Html, sem2Html, calJsonStr, messagesHtml = "") {
   const sessionId = hiddenInputValue(mc, "pInstance");
 
@@ -674,35 +720,7 @@ function parseMainPageData(mc, sem1Html, sem2Html, calJsonStr, messagesHtml = ""
   };
 
   // Multi-student options
-  const studentOptions = [];
-  const seenStudentIds = new Set();
-  const navMatch = mc.match(/id=["']t_TreeNav["'][^>]*>([\s\S]*?)<\/ul>/i) ||
-    mc.match(/<nav[^>]*aria-label=["']Application["'][^>]*>([\s\S]*?)<\/nav>/i) ||
-    mc.match(/class=["'][^"']*t-TreeNav[^"']*["'][^>]*>([\s\S]*?)<\/ul>/i);
-  if (navMatch) {
-    for (const am of navMatch[1].matchAll(/<li([^>]*)>\s*<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
-      const liAttrs = am[1] || "";
-      const href = decodeHtml(am[2]).trim();
-      const name = stripInlineTags(am[3]).replace(/\[.*?\]/g, "").replace(/\s+/g, " ").trim();
-      if (!name || !href) continue;
-      const idM = href.match(/user_eleve_id=([A-Za-z0-9]+)/);
-      const id = idM ? idM[1] : name;
-      if (seenStudentIds.has(id)) continue;
-      seenStudentIds.add(id);
-      studentOptions.push({
-        id,
-        name,
-        switchUrl: href.startsWith("http") ? href : `${SIME_BASE}${href}`,
-        isSelected: /is-current/i.test(liAttrs) || /data-current=["']true["']/i.test(liAttrs)
-      });
-    }
-  }
-  if (studentOptions.length > 0 && !studentOptions.some((opt) => opt.isSelected)) {
-    const normFull = fullName.replace(/\s+/g, " ").trim().toLowerCase();
-    const matched = (normFull && studentOptions.find((opt) => opt.name.toLowerCase() === normFull))
-      || (studentOptions.length === 1 ? studentOptions[0] : null);
-    if (matched) matched.isSelected = true;
-  }
+  const studentOptions = parseStudentOptionsFromHtml(mc, fullName);
 
   // Presence
   const hiddenPresence = hiddenInputValue(mc, "P1_PRESENCE_PERCENT").replace("%", "").trim();
@@ -1107,26 +1125,50 @@ async function fetchFullPortalFromMainPage(jar, mainRes) {
   ]);
 
   const snapshot = parseMainPageData(mc, sem1Html, sem2Html, calJsonStr, messagesHtml);
+  const selectedStudentId =
+    snapshot.studentOptions.find((o) => o.isSelected)?.id ||
+    extractUserEleveId(mainRes.finalUrl) ||
+    "";
   return {
     snapshot,
     sessionToken: {
       cookie: cookieHeaderFromJar(jar),
       mainPageUrl: mainRes.finalUrl,
-      sessionId: snapshot.sessionId
+      sessionId: snapshot.sessionId,
+      selectedStudentId
     }
   };
 }
 
+async function switchToStudentIfNeeded(jar, mainRes, targetStudentId) {
+  if (!targetStudentId || !mainRes?.text) return mainRes;
+  const freshOptions = parseStudentOptionsFromHtml(mainRes.text);
+  const targetOpt = freshOptions.find((o) => o.id === targetStudentId);
+  if (!targetOpt || targetOpt.isSelected) return mainRes;
+  try {
+    const switched = await fetchWithCookies(jar, targetOpt.switchUrl);
+    if (switched.finalUrl.includes("/main-page") && switched.text.includes("RegBadge")) {
+      return switched;
+    }
+  } catch {}
+  return mainRes;
+}
+
 async function handleSync(body) {
-  const { username, password, userType = 2, sessionToken } = body;
-  const jar = jarFromCookieString(sessionToken?.cookie);
+  const { username, password, userType = 2, sessionToken, selectedStudentId } = body;
+  const targetStudentId =
+    selectedStudentId ||
+    sessionToken?.selectedStudentId ||
+    extractUserEleveId(sessionToken?.mainPageUrl);
+
+  let jar = jarFromCookieString(sessionToken?.cookie);
   let mainRes = null;
 
   if (sessionToken?.cookie && sessionToken?.mainPageUrl) {
     try {
       const probe = await fetchWithCookies(jar, sessionToken.mainPageUrl);
       if (probe.finalUrl.includes("/main-page") && probe.text.includes("RegBadge")) {
-        mainRes = probe;
+        mainRes = await switchToStudentIfNeeded(jar, probe, targetStudentId);
       }
     } catch {}
   }
@@ -1137,31 +1179,43 @@ async function handleSync(body) {
       err.statusCode = 401;
       throw err;
     }
-    mainRes = await performApexLogin(jar, username, password, userType);
+    jar = new Map();
+    const loginRes = await performApexLogin(jar, username, password, userType);
+    mainRes = await switchToStudentIfNeeded(jar, loginRes, targetStudentId);
   }
 
   return fetchFullPortalFromMainPage(jar, mainRes);
 }
 
 async function handleSwitchStudent(body) {
-  const { switchUrl, username, password, userType = 2, sessionToken } = body;
-  if (!switchUrl) throw new Error("Lipsește switchUrl.");
-  const jar = jarFromCookieString(sessionToken?.cookie);
+  const { switchUrl, studentId, username, password, userType = 2, sessionToken } = body;
+  const targetStudentId = studentId || extractUserEleveId(switchUrl);
+  if (!switchUrl && !targetStudentId) throw new Error("Lipsește switchUrl.");
 
+  let jar = jarFromCookieString(sessionToken?.cookie);
   let mainRes = null;
-  if (sessionToken?.cookie) {
-    const res = await fetchWithCookies(jar, switchUrl);
-    if (res.finalUrl.includes("/main-page") && res.text.includes("RegBadge")) {
-      mainRes = res;
-    }
+
+  if (sessionToken?.cookie && switchUrl) {
+    try {
+      const res = await fetchWithCookies(jar, switchUrl);
+      if (res.finalUrl.includes("/main-page") && res.text.includes("RegBadge")) {
+        const opts = parseStudentOptionsFromHtml(res.text);
+        const activeId = opts.find((o) => o.isSelected)?.id || extractUserEleveId(res.finalUrl);
+        if (!targetStudentId || activeId === targetStudentId) {
+          mainRes = res;
+        } else {
+          mainRes = await switchToStudentIfNeeded(jar, res, targetStudentId);
+        }
+      }
+    } catch {}
   }
+
   if (!mainRes && username && password) {
-    await performApexLogin(jar, username, password, userType);
-    const res = await fetchWithCookies(jar, switchUrl);
-    if (res.finalUrl.includes("/main-page") && res.text.includes("RegBadge")) {
-      mainRes = res;
-    }
+    jar = new Map();
+    const loginRes = await performApexLogin(jar, username, password, userType);
+    mainRes = await switchToStudentIfNeeded(jar, loginRes, targetStudentId);
   }
+
   if (!mainRes) {
     const err = new Error("Sesiunea a expirat.");
     err.statusCode = 401;
@@ -1184,21 +1238,38 @@ function findMatchingLesson(events, { dateIso, periodNumber, subject }) {
 }
 
 async function handleLessonDetail(body) {
-  const { detailUrl, dateIso, periodNumber, subject, username, password, userType = 2, sessionToken } = body;
+  const {
+    detailUrl,
+    dateIso,
+    periodNumber,
+    subject,
+    username,
+    password,
+    userType = 2,
+    sessionToken,
+    selectedStudentId
+  } = body;
+  const targetStudentId =
+    selectedStudentId ||
+    sessionToken?.selectedStudentId ||
+    extractUserEleveId(sessionToken?.mainPageUrl);
+
   let jar = jarFromCookieString(sessionToken?.cookie);
   const targetUrl = detailUrl;
 
   if (targetUrl && jar.size > 0) {
-    const res = await fetchWithCookies(jar, targetUrl);
-    if (res.resp.status === 200 && res.text.includes("lesson-view") && !res.text.includes("P101_USERNAME")) {
-      return {
-        detail: parseLessonDetailHtml(res.text),
-        sessionToken: {
-          ...sessionToken,
-          cookie: cookieHeaderFromJar(jar)
-        }
-      };
-    }
+    try {
+      const res = await fetchWithCookies(jar, targetUrl);
+      if (res.resp.status === 200 && res.text.includes("lesson-view") && !res.text.includes("P101_USERNAME")) {
+        return {
+          detail: parseLessonDetailHtml(res.text),
+          sessionToken: {
+            ...sessionToken,
+            cookie: cookieHeaderFromJar(jar)
+          }
+        };
+      }
+    } catch {}
   }
 
   if (!username || !password) {
@@ -1208,7 +1279,8 @@ async function handleLessonDetail(body) {
   }
 
   jar = new Map();
-  const mainRes = await performApexLogin(jar, username, password, userType);
+  const loginRes = await performApexLogin(jar, username, password, userType);
+  const mainRes = await switchToStudentIfNeeded(jar, loginRes, targetStudentId);
   const apexCtx = extractMainPageApexContext(mainRes.text);
   let match = null;
   let nextSessionToken = null;
@@ -1221,7 +1293,8 @@ async function handleLessonDetail(body) {
       nextSessionToken = {
         cookie: cookieHeaderFromJar(jar),
         mainPageUrl: mainRes.finalUrl,
-        sessionId: hiddenInputValue(mainRes.text, "pInstance") || apexCtx.mInst || sessionToken?.sessionId || ""
+        sessionId: hiddenInputValue(mainRes.text, "pInstance") || apexCtx.mInst || sessionToken?.sessionId || "",
+        selectedStudentId: targetStudentId || ""
       };
     }
   }
@@ -1258,7 +1331,8 @@ function buildRequestCoalesceKey(action, body) {
     String(body.username || "").trim().toLowerCase(),
     String(body.password || ""),
     String(body.sessionToken?.mainPageUrl || ""),
-    String(body.sessionToken?.cookie || "")
+    String(body.sessionToken?.cookie || ""),
+    String(body.selectedStudentId || body.sessionToken?.selectedStudentId || "")
   ];
   if (action === "sync") {
     return `sync:${sha256Hex(authParts)}`;
@@ -1273,7 +1347,7 @@ function buildRequestCoalesceKey(action, body) {
     ])}`;
   }
   if (action === "switchStudent") {
-    return `switch:${sha256Hex([...authParts, String(body.switchUrl || "")])}`;
+    return `switch:${sha256Hex([...authParts, String(body.switchUrl || ""), String(body.studentId || "")])}`;
   }
   return "";
 }

@@ -404,10 +404,44 @@ class SimeSessionBridge(private val context: Context) {
             )
         }
 
+        val targetStudentId = targetMainUrl?.let {
+            Regex("user_eleve_id=([A-Za-z0-9]+)", RegexOption.IGNORE_CASE)
+                .find(it)?.groupValues?.get(1)
+        }
         val curHref = evalJsString(wv, "window.location.href")
         if (!curHref.contains("/main-page") || !hasDashboardContent(wv)) {
             val loginResult = performApexLogin(wv, username, password, userType) { currentUrl }
             if (loginResult != null) return loginResult
+            if (targetStudentId != null) {
+                val freshHref = evalJsString(
+                    wv,
+                    """
+                    (function() {
+                      var links = document.querySelectorAll('#t_TreeNav a[href*="user_eleve_id="], .t-TreeNav a[href*="user_eleve_id="]');
+                      for (var i = 0; i < links.length; i++) {
+                        var href = links[i].getAttribute('href') || '';
+                        if (href.indexOf('user_eleve_id=$targetStudentId') !== -1) {
+                          var li = links[i].closest('li');
+                          if (li && (li.getAttribute('data-current') === 'true' || li.classList.contains('is-current'))) {
+                            return '';
+                          }
+                          return href;
+                        }
+                      }
+                      return '';
+                    })();
+                    """.trimIndent()
+                )
+                if (freshHref.isNotBlank()) {
+                    val resolvedSwitch = if (freshHref.startsWith("http")) freshHref else "https://agenda.sime.md$freshHref"
+                    withContext(Dispatchers.Main) { wv.loadUrl(resolvedSwitch) }
+                    waitForCondition(10000L) {
+                        val h = evalJsString(wv, "window.location.href")
+                        val r = evalJsString(wv, "document.readyState")
+                        r == "complete" && h.contains("/main-page") && hasDashboardContent(wv)
+                    }
+                }
+            }
         }
         return null
     }
