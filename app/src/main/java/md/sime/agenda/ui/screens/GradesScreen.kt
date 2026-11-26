@@ -348,6 +348,11 @@ private fun SubjectGradesCard(
                     val isClickable = dg.isSimulated || !dg.dateIso.isNullOrBlank()
                     val numVal = dg.numericValue
                     val (keycapBg, keycapBorder, valueColor) = when {
+                        evaluationType == SubjectEvaluationType.DESCRIPTOR_ONLY -> Triple(
+                            if (colors.isDark) Color(0xFFA5B4FC).copy(alpha = 0.17f) else Color(0xFF4F46E5).copy(alpha = 0.11f),
+                            if (colors.isDark) Color(0xFFA5B4FC).copy(alpha = 0.50f) else Color(0xFF4F46E5).copy(alpha = 0.42f),
+                            if (colors.isDark) Color(0xFFC7D2FE) else Color(0xFF3730A3)
+                        )
                         dg.isSimulated -> Triple(
                             colors.surfaceElevated,
                             colors.gradeLowMid,

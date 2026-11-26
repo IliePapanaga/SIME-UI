@@ -938,6 +938,12 @@ html[data-theme="light"] .bottom-nav {
   color: var(--badge-qual-text);
 }
 
+.mark-keycap.tier-desc {
+  background: var(--badge-desc-bg);
+  border-color: var(--badge-desc-border);
+  color: var(--badge-desc-text);
+}
+
 .mark-keycap.tier-qual .mark-val {
   font-size: 13px;
 }

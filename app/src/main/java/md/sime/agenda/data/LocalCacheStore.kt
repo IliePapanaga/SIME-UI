@@ -311,9 +311,10 @@ class LocalCacheStore(context: Context) {
                 }
             } else emptyList()
 
+            val subjectName = o.optString("subject")
             SubjectGrades(
                 semester = semester,
-                subject = o.optString("subject"),
+                subject = subjectName,
                 rawEntries = rawEntries,
                 datedGrades = dated,
                 numericGrades = numGrades,
@@ -321,7 +322,11 @@ class LocalCacheStore(context: Context) {
                 teza = teza,
                 tezaRaw = tezaRaw,
                 officialAverage = officialAvg,
-                liveAverage = GradeCalculator.calculateSubjectAverage(numGrades, teza)
+                liveAverage = if (GradeCalculator.isDescriptorOnlySubject(subjectName)) {
+                    null
+                } else {
+                    GradeCalculator.calculateSubjectAverage(numGrades, teza)
+                }
             )
         }
     }

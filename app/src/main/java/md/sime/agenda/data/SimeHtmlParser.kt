@@ -252,7 +252,11 @@ object SimeHtmlParser {
             val tezaRaw = tezaCell?.text()?.trim()?.takeIf { it.isNotBlank() }
             val teza = tezaRaw?.toIntOrNull()
             val officialAvg = medCell?.text()?.trim()?.takeIf { it.isNotBlank() }
-            val liveAvg = GradeCalculator.calculateSubjectAverage(numericGrades, teza)
+            val liveAvg = if (GradeCalculator.isDescriptorOnlySubject(subject)) {
+                null
+            } else {
+                GradeCalculator.calculateSubjectAverage(numericGrades, teza)
+            }
 
             SubjectGrades(
                 semester = semester,

@@ -237,5 +237,17 @@ class GradeCalculatorTest {
         assertEquals(SubjectEvaluationType.DESCRIPTOR_ONLY, GradeCalculator.getEvaluationType(edSoc))
         assertEquals(SubjectEvaluationType.DESCRIPTOR_ONLY, GradeCalculator.getEvaluationType(dezv))
         assertEquals(SubjectEvaluationType.NUMERIC, GradeCalculator.getEvaluationType(litUniv))
+
+        // Even if SIME stores numeric descriptor values (e.g. 4, 7) on Educație pentru societate,
+        // it must remain DESCRIPTOR_ONLY, have liveAverage == null, and never affect overall GPA.
+        val edSocWithNums = edSoc.copy(
+            rawEntries = listOf("4", "7"),
+            datedGrades = listOf(DatedGrade("d1", 4, "4"), DatedGrade("d2", 7, "7")),
+            numericGrades = listOf(4, 7),
+            liveAverage = 5.5
+        )
+        assertEquals(SubjectEvaluationType.DESCRIPTOR_ONLY, GradeCalculator.getEvaluationType(edSocWithNums))
+        assertNull(GradeCalculator.applySimulatedMarks(edSocWithNums, emptyList()).liveAverage)
+        assertEquals(10.0, GradeCalculator.calculateOverallAverage(listOf(math, edSocWithNums))!!, 0.0001)
     }
 }

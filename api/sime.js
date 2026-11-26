@@ -339,6 +339,16 @@ function parseDisplayDateToEpochDay(dateDisplay) {
   return Math.floor(Date.parse(`${iso}T00:00:00Z`) / 86400000);
 }
 
+const DESCRIPTOR_ONLY_KEYWORDS = [
+  "dezvoltare personala",
+  "educatie pentru societate"
+];
+
+function isDescriptorOnlySubject(subject) {
+  const norm = normalizeSubject(subject);
+  return DESCRIPTOR_ONLY_KEYWORDS.some((k) => norm.includes(k));
+}
+
 function truncateTo2(num) {
   if (num == null || Number.isNaN(Number(num))) return null;
   const n = Number(num);
@@ -409,7 +419,7 @@ function parseSemesterGradesHtml(reportHtml, semester) {
       teza,
       tezaRaw,
       officialAverage,
-      liveAverage: calculateSubjectAverage(numericGrades, teza)
+      liveAverage: isDescriptorOnlySubject(subject) ? null : calculateSubjectAverage(numericGrades, teza)
     });
   }
   return subjects;
@@ -518,7 +528,7 @@ function enrichGradesWithDates(subjects, recentEvaluations, scheduleEvents) {
     return {
       ...sub,
       datedGrades: matched,
-      liveAverage: calculateSubjectAverage(sub.numericGrades, sub.teza)
+      liveAverage: isDescriptorOnlySubject(sub.subject) ? null : calculateSubjectAverage(sub.numericGrades, sub.teza)
     };
   });
 }

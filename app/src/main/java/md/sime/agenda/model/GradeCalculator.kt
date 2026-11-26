@@ -24,10 +24,18 @@ object GradeCalculator {
         "educatie tehnologica"
     )
 
+    fun isDescriptorOnlySubject(subjectName: String): Boolean {
+        val norm = normalizeSubject(subjectName)
+        return descriptorOnlySubjectKeywords.any { norm.contains(it) }
+    }
+
     fun getEvaluationType(
         subject: SubjectGrades,
         allSemesterSubjects: List<SubjectGrades> = emptyList()
     ): SubjectEvaluationType {
+        if (isDescriptorOnlySubject(subject.subject)) {
+            return SubjectEvaluationType.DESCRIPTOR_ONLY
+        }
         if (subject.numericGrades.isNotEmpty() || subject.teza != null) {
             return SubjectEvaluationType.NUMERIC
         }
@@ -35,9 +43,6 @@ object GradeCalculator {
             return SubjectEvaluationType.QUALIFIER
         }
         val norm = normalizeSubject(subject.subject)
-        if (descriptorOnlySubjectKeywords.any { norm.contains(it) }) {
-            return SubjectEvaluationType.DESCRIPTOR_ONLY
-        }
         if (qualifierSubjectKeywords.any { norm.contains(it) }) {
             return SubjectEvaluationType.QUALIFIER
         }
@@ -191,6 +196,7 @@ object GradeCalculator {
         simulatedBySubject: Map<String, List<Int>> = emptyMap()
     ): Double? {
         val averages = subjects.mapNotNull { subject ->
+            if (isDescriptorOnlySubject(subject.subject)) return@mapNotNull null
             val extra = simulatedBySubject[subject.subject].orEmpty()
             calculateSubjectAverage(subject.numericGrades + extra, subject.teza)
         }
@@ -205,6 +211,9 @@ object GradeCalculator {
         simulatedMarks: List<Int>,
         simulatedQualifiers: List<String> = emptyList()
     ): SubjectGrades {
+        if (isDescriptorOnlySubject(subject.subject)) {
+            return subject.copy(liveAverage = null)
+        }
         if (simulatedMarks.isEmpty() && simulatedQualifiers.isEmpty()) {
             val live = calculateSubjectAverage(subject.numericGrades, subject.teza)
             return subject.copy(liveAverage = live)
@@ -354,7 +363,11 @@ object GradeCalculator {
 
             subject.copy(
                 datedGrades = matched.filterNotNull(),
-                liveAverage = calculateSubjectAverage(subject.numericGrades, subject.teza)
+                liveAverage = if (isDescriptorOnlySubject(subject.subject)) {
+                    null
+                } else {
+                    calculateSubjectAverage(subject.numericGrades, subject.teza)
+                }
             )
         }
     }

@@ -235,7 +235,15 @@
     return null;
   }
 
+  function isDescriptorOnlySubject(subjectName) {
+    const norm = normalizeSubject(subjectName);
+    return DESCRIPTOR_ONLY_KEYWORDS.some((k) => norm.includes(k));
+  }
+
   function getEvaluationType(subject, allSemesterSubjects) {
+    if (isDescriptorOnlySubject(subject.subject)) {
+      return "DESCRIPTOR_ONLY";
+    }
     if ((subject.numericGrades && subject.numericGrades.length > 0) || subject.teza != null) {
       return "NUMERIC";
     }
@@ -243,7 +251,6 @@
       return "QUALIFIER";
     }
     const norm = normalizeSubject(subject.subject);
-    if (DESCRIPTOR_ONLY_KEYWORDS.some((k) => norm.includes(k))) return "DESCRIPTOR_ONLY";
     if (QUALIFIER_KEYWORDS.some((k) => norm.includes(k))) return "QUALIFIER";
     if (
       allSemesterSubjects &&
@@ -330,12 +337,13 @@
       }));
       const combinedNums = [...(sub.numericGrades || []), ...simNums];
       const combinedQuals = [...(sub.qualifiers || []), ...simQuals];
+      const descriptorOnly = isDescriptorOnlySubject(sub.subject);
       return {
         ...sub,
         datedGrades: [...(sub.datedGrades || []), ...extraNums, ...extraQuals],
         numericGrades: combinedNums,
         qualifiers: combinedQuals,
-        liveAverage: calculateSubjectAvg(combinedNums, sub.teza)
+        liveAverage: descriptorOnly ? null : calculateSubjectAvg(combinedNums, sub.teza)
       };
     });
   }
@@ -740,12 +748,13 @@
       ? `<div class="glass-card" style="padding:14px;font-size:13px;" ><span class="secondary">Nicio lecție programată. Deschide Orar pentru săptămâni.</span></div>`
       : `<div class="glass-card">${previewLessons.map((l) => {
           const meta = [l.room ? `Cab. ${l.room}` : "", l.teacher].filter(Boolean).join(" · ");
+          const isDescSub = isDescriptorOnlySubject(l.subject);
           const right = l.badgeText
             ? renderEvalBadge(l.badgeText, {
                 isAbsent: l.isAbsent,
-                numericGrade: l.numericGrade,
-                isQualifier: l.numericGrade == null && !l.isAbsent && canonicalQualifier(l.badgeText) != null,
-                isDescriptor: l.numericGrade == null && !l.isAbsent && canonicalQualifier(l.badgeText) == null,
+                numericGrade: isDescSub ? null : l.numericGrade,
+                isQualifier: !isDescSub && l.numericGrade == null && !l.isAbsent && canonicalQualifier(l.badgeText) != null,
+                isDescriptor: !l.isAbsent && (isDescSub || (l.numericGrade == null && canonicalQualifier(l.badgeText) == null)),
                 small: true
               })
             : "";
@@ -786,14 +795,15 @@
       ? `<div class="glass-card" style="padding:14px;font-size:13px;"><span class="secondary">Nu există note recente.</span></div>`
       : `<div class="glass-card">${evals.map((ev) => {
           const dIso = parseDisplayDateToIso(ev.date);
+          const isDescSub = isDescriptorOnlySubject(ev.subject);
           const rawGrade = String(ev.grade || "").trim();
-          const isNum = /^\d+([.,]\d+)?$/.test(rawGrade);
+          const isNum = !isDescSub && /^\d+([.,]\d+)?$/.test(rawGrade);
           const numVal = isNum ? parseFloat(rawGrade.replace(",", ".")) : null;
-          const isQual = canonicalQualifier(rawGrade) != null;
+          const isQual = !isDescSub && canonicalQualifier(rawGrade) != null;
           const badge = renderEvalBadge(rawGrade, {
             numericGrade: numVal,
             isQualifier: isQual,
-            isDescriptor: !isNum && !isQual
+            isDescriptor: isDescSub || (!isNum && !isQual)
           });
           return `
             <div class="ledger-row" ${dIso ? `data-jump="${esc(dIso)}|${esc(ev.subject)}|1"` : ""}>
@@ -909,12 +919,13 @@
               : lessons.map((l) => {
                   const rowHi = isSel && normHi && normalizeSubject(l.subject) === normHi;
                   const meta = [l.teacher, l.room ? `Cab. ${l.room}` : ""].filter(Boolean).join(" · ");
+                  const isDescSub = isDescriptorOnlySubject(l.subject);
                   const rightHtml = l.badgeText
                     ? renderEvalBadge(l.badgeText, {
                         isAbsent: l.isAbsent,
-                        numericGrade: l.numericGrade,
-                        isQualifier: l.numericGrade == null && !l.isAbsent && canonicalQualifier(l.badgeText) != null,
-                        isDescriptor: l.numericGrade == null && !l.isAbsent && canonicalQualifier(l.badgeText) == null,
+                        numericGrade: isDescSub ? null : l.numericGrade,
+                        isQualifier: !isDescSub && l.numericGrade == null && !l.isAbsent && canonicalQualifier(l.badgeText) != null,
+                        isDescriptor: !l.isAbsent && (isDescSub || (l.numericGrade == null && canonicalQualifier(l.badgeText) == null)),
                         small: true
                       })
                     : "";
@@ -975,7 +986,10 @@
     const subjects = getEnrichedSemesterSubjects(state.selectedSemester);
     const overall = getLiveOverallAverage(state.selectedSemester);
     const anySim = hasAnySimulated();
-    const totalMarks = subjects.reduce((a, b) => a + (b.numericGrades?.length || 0), 0);
+    const totalMarks = subjects.reduce(
+      (a, b) => a + (isDescriptorOnlySubject(b.subject) ? 0 : (b.numericGrades?.length || 0)),
+      0
+    );
     const gradedCount = subjects.filter((s) => s.liveAverage != null).length;
 
     const cardsHtml = subjects.length === 0
@@ -1008,7 +1022,9 @@
             bodyHtml = `<div class="hairline" style="margin:10px 0;"></div><div class="chips-flow">${sub.datedGrades.map((dg) => {
               const clickable = dg.isSimulated || Boolean(dg.dateIso);
               const dLabel = dg.isSimulated ? "Sim." : (dg.dateDisplay ? formatDisplayShort(dg.dateDisplay) : "");
-              const tierCls = dg.isSimulated ? "simulated" : getMarkKeycapTier(dg);
+              const tierCls = evalType === "DESCRIPTOR_ONLY"
+                ? "tier-desc"
+                : (dg.isSimulated ? "simulated" : getMarkKeycapTier(dg));
               const attr = dg.isSimulated
                 ? `data-pop-sim="${esc(sub.subject)}|${dg.numericValue == null ? "q" : "n"}"`
                 : (dg.dateIso ? `data-jump="${esc(dg.dateIso)}|${esc(sub.subject)}|1"` : "");
