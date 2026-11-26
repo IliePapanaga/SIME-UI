@@ -1939,18 +1939,19 @@
       }
 
       // Dossier modal actions
-      const themeBtn = target.closest("[data-theme]");
-      if (themeBtn) {
-        applyTheme(themeBtn.getAttribute("data-theme"));
-        render({ part: "modals" });
-        return;
-      }
       const switchBtn = target.closest("[data-switch-student]");
       if (switchBtn) {
+        e.preventDefault?.();
         switchStudent(
           switchBtn.getAttribute("data-switch-student"),
           switchBtn.getAttribute("data-student-id") || ""
         );
+        return;
+      }
+      const themeBtn = target.closest("button[data-theme]");
+      if (themeBtn && root.contains(themeBtn)) {
+        applyTheme(themeBtn.getAttribute("data-theme"));
+        render({ part: "modals" });
         return;
       }
       if (target.closest("#btnPwaInstall") && deferredInstallPrompt) {

@@ -1,6 +1,6 @@
 {
   "name": "agenda-sime",
-  "version": "1.2.12",
+  "version": "1.2.13",
   "private": true,
   "description": "Minimalist Liquid Glass client & Vercel PWA for Moldova's SIME portal (agenda.sime.md)",
   "engines": {
